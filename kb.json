@@ -3,7 +3,7 @@
         {"Sensitivity":                     3},
         {"Reticle type":                    "Crosshairs"},
         {"Reticle Advanced": [
-            {"Show Accuracy":               false},                    
+            {"Show Accuracy":               false},
             {"Color":                       "White"},
             {"Thickness":                   1},
             {"Crosshair length":            6},
@@ -16,14 +16,14 @@
         ]},
         {"Allied health bars":              "Always"},
         {"Show friendly outlines":          "Occluded"},
-        
+
         {"Forward":                         "o"},
         {"Back":                            "l"},
         {"Left":                            "k"},
         {"Right":                           "oem_3"},
         {"Crouch":                          "space"},
         {"Toggle crouch":                   ""},
-                
+
         {"Jump":                            "r shift"},
         {"Ability 1":                       "n"},
         {"Ability 2":                       "oem_7"},
@@ -37,33 +37,54 @@
         {"Reload":                          ["r", "oem_6"]},
         {"Next weapon":                     ""},
         {"Previous weapon":                 ""},
-                
-        {"Communication menu":              "up"},
-        {"Emote (default)":                 ""},
-        {"Hello":                           "0"},
-        {"Need healing/buffs":              "p"},
-        {"Group up":                        "oem_period"},
-        {"Ultimate status":                 "oem_comma"},
-        {"Voice line (default)":            ""},
-        {"Acknowledge":                     "6"},
-        {"Thanks":                          "9"},
-                
+
+        {"Communication menu":              "p"},
+        {"Commo rose N":                    "Go"},
+        {"Commo rose NW":                   "Yes"},
+        {"Commo rose NE":                   "No"},
+        {"Commo rose W":                    "Thanks"},
+        {"Commo rose E":                    "Sorry"},
+        {"Commo rose SW":                   "Need healing/buffs"},
+        {"Commo rose SE":                   "Group up"},
+        {"Commo rose S":                    "Countdown"},
+
+        {"Countdown":                       ""},
+        {"Defending":                       ""},
+        {"Emote (up)":                      ""},
+        {"Fall back":                       ""},
+        {"Go":                              ""},
+        {"Going in":                        ""},
+        {"Goodbye":                         ""},
+        {"Incoming":                        ""},
+        {"Need help":                       ""},
+        {"No":                              ""},
+        {"On my way":                       ""},
+        {"Press the attack":                ""},
+        {"Push forward":                    ""},
+        {"Ready":                           ""},
+        {"Sorry":                           ""},
+        {"With you":                        ""},
+        {"Yes":                             ""},
+        {"You are welcome":                 ""},
+        
         {"Emote menu":                      "down"},
-        {"Emote right":                     ""},
-        {"Emote down":                      ""},
-        {"Emote left":                      ""},
-                
+        {"Emote (up) (menu)":               ""},
+        {"Emote (right)":                   ""},
+        {"Emote (down)":                    ""},
+        {"Emote (left)":                    ""},
+        
         {"Voice line menu":                 "right"},
-        {"Voice line right":                ""},
-        {"Voice line down":                 ""},
-        {"Voice line left":                 ""},
-                
+        {"Voice line (up)":                 ""},
+        {"Voice line (right)":              ""},
+        {"Voice line (down)":               ""},
+        {"Voice line (left)":               ""},
+        
         {"Spray menu":                      "left"},
-        {"Spray (default)":                 ""},
-        {"Spray right":                     ""},
-        {"Spray down":                      ""},
-        {"Spray left":                      ""},
-                
+        {"Spray (up)":                      ""},
+        {"Spray (right)":                   ""},
+        {"Spray (down)":                    ""},
+        {"Spray (left)":                    ""},
+
         {"All chat":                        ""},
         {"Hide chat":                       "delete"},
         {"Open chat":                       "enter"},
@@ -71,7 +92,7 @@
         {"Team chat":                       ""},
         {"Voice chat: Push to talk":        "b"},
         {"Voice chat: Toggle mic mute":     ""},
-        
+
         {"Capture highlight":               "f9"},
         {"Capture highlight - Slot 1":      ""},
         {"Capture highlight - Slot 2":      ""},
@@ -111,7 +132,7 @@
     {"dva": [
         {"Hold boosters":                           true},
         {"Ability 2":                               ["oem_7", "r"]},
-        {"Reticle Advanced": [           
+        {"Reticle Advanced": [
             {"Crosshair length":                    20},
             {"Center gap":                          100},
             {"Opacity":                             40},
@@ -123,7 +144,7 @@
     ]},
     {"lucio": [
         {"Allow backwards wallride":                true},
-        {"Reticle Advanced": [           
+        {"Reticle Advanced": [
             {"Crosshair length":                    14},
             {"Center gap":                          100},
             {"Opacity":                             60},
@@ -142,7 +163,7 @@
         {"Toggle beam connection":                  true},
         {"Guardian angel prefers beam target":      false},
         {"Toggle guardian angel":                   true},
-        {"Reticle Advanced": [           
+        {"Reticle Advanced": [
             {"Crosshair length":                    20},
             {"Center gap":                          100},
             {"Opacity":                             40},
@@ -150,11 +171,11 @@
     ]},
     {"moira": [
         {"Primary fire":                            "mouse right click"},
-        {"Secondary fire":                          "mouse left click"},    
+        {"Secondary fire":                          "mouse left click"},
     ]},
-    {"orisa": [        
+    {"orisa": [
         {"Reticle type":                            "Circle"},
-        {"Reticle Advanced": [           
+        {"Reticle Advanced": [
             {"Crosshair length":                    2},
             {"Center gap":                          100},
             {"Opacity":                             20},

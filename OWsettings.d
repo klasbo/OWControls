@@ -32,6 +32,8 @@ import std.functional;
 import std.getopt;
 import std.json;
 import std.math;
+import std.range;
+import std.regex;
 import std.stdio;
 import std.string;
 
@@ -39,7 +41,9 @@ import std.string;
 
 
 
-__gshared auto tick = 17.msecs;
+auto tick           = 17.msecs;
+auto menuLoadTime   = 800.msecs;
+auto scrollLoadTime = 100.msecs;
 
 enum Hotkey {
     HK1,
@@ -54,33 +58,47 @@ auto optionsMenu            = POINT(20500, 31850);
 auto optionsTop             = POINT(15350, 15930);
 auto optionsScrollBarTop    = POINT(53247, 9103 );
 
-
+struct Options {
+    JSONValue           top;
+    JSONValue           middle;
+    JSONValue           bottom;
+    string[]            heroList;
+    JSONValue[string]   hero;
+}
 
 void main(string[] args){
 
     string inputFile;
-    
+    auto sw = StopWatch(AutoStart.no);
+
     getopt(args,
         std.getopt.config.required,
         "i|input", &inputFile,
     );
 
-    writeln("started");
-
     RegisterHotKey(null, Hotkey.HK1, 0x4000, VK_F6);
     RegisterHotKey(null, Hotkey.HK2, 0x4000, VK_F7);
     RegisterHotKey(null, Hotkey.HK3, 0x4000, VK_F8);
-
-    auto optionsStrs = loadOptions();
-    string settings = readText(inputFile);
-
-    auto sw = StopWatch(AutoStart.no);
+    
+    writeln("started");
+    
     sw.start();
-    auto inputs = heroSettingsToActions(settings.parseJSON, optionsStrs);
-    sw.stop();
-
+    
+    auto j = "options.json".readText.tryParseJSON;
+    auto options = Options(
+        j["top"],
+        j["middle"],
+        j["bottom"],
+        j["heroList"].array.map!(a => a.str).array,
+        j["hero"].object
+    );
+    
+    auto inputs = heroSettingsToActions(inputFile.readText.tryParseJSON, options);
+    
+    sw.stop();    
     auto loadTime = sw.peek.split!("msecs", "usecs");
-    writefln("Load complete (t: %d.%03dms)", loadTime.msecs, loadTime.usecs);
+    writefln("Loading complete (t: %d.%03dms)", loadTime.msecs, loadTime.usecs);
+    
     auto inputTime = (inputs.length * tick).split!("seconds", "msecs");
     writefln("Inputting settings should take %d.%01d seconds", inputTime.seconds, inputTime.msecs/100);
 
@@ -103,7 +121,7 @@ void main(string[] args){
     }
 }
 
-// "Reticle advanced"-"Show accuracy" setting makes "center gap" setting unavailable when toggled on. 
+// "Reticle advanced"-"Show accuracy" setting makes "center gap" setting unavailable when toggled on.
 
 
 
@@ -113,6 +131,7 @@ enum OptionType {
     Dropdown,
     Submenu,
     Binding,
+    Commo,
 }
 
 struct OptionInfo {
@@ -122,8 +141,23 @@ struct OptionInfo {
 }
 
 
-
-
+JSONValue tryParseJSON(string s){
+    JSONValue v;
+    try {
+        v = parseJSON(s);
+    } catch(Exception e){
+        e.msg.writeln;
+        auto matches = e.msg.matchFirst(r"^.+?Line (\d+?):(\d+?)\)");
+        if(matches.length == 3){
+            auto line = matches[1].to!int;
+            auto col  = matches[2].to!int;
+            s.splitLines[line-1].writeln;
+            writeln(" ".repeat(col-1).reduce!"a~b", "^");
+        }
+        throw e;
+    }
+    return v;
+}
 
 alias genOptions = memoize!_genOptions;
 
@@ -145,13 +179,13 @@ OptionInfo[string] _genOptions(JSONValue optionset){
             switch(validRange.type){
             case JSONType.array:
                 assert(validRange.array.length > 0,
-                    format("An option-object must have a specified range of valid values (%s)", name));
+                    format("Option \"%s\"'s valid range cannot be an empty array", name));
                 switch(validRange.array[0].type){
 
                 case JSONType.object:
 // object with {string : array of length n with objects}:               this is a submenu
                     assert(validRange.array.all!(a => a.type == JSONType.object),
-                        format("Option %s's first valid value is an object, but the rest are not", name));
+                        format("Submenu option \"%s\"'s first valid value is an object, but the rest are not", name));
                     o[name] = OptionInfo(idx, OptionType.Submenu, validRange);
                     break;
 
@@ -159,28 +193,41 @@ OptionInfo[string] _genOptions(JSONValue optionset){
                 case JSONType.integer, JSONType.float_:
 // object with {string : array of length 2 with integers or floats}:    this is a slider
                     assert(validRange.array.length == 2,
-                        format("Option %s's first valid value indicates a slider, which must have only 2 values. Got %d instead (%s)",
+                        format("Slider option \"%s\"'s first valid value indicates a slider, which must have only 2 values. Got %d instead (%s)",
                         name, validRange.array.length, validRange));
                     assert(validRange.array[1].type == JSONType.integer || validRange.array[1].type == JSONType.float_,
-                        format("Option %s's first valid value is a number, but the second one is %s", name, validRange.array[1].type));
+                        format("Slider option \"%s\"'s first valid value is a number, but the second one is %s", name, validRange.array[1].type));
                     o[name] = OptionInfo(idx, OptionType.Slider, validRange);
                     break;
 
                 case JSONType.string:
 // object with {string : array of length n with strings}:               this is a drop-down
                     assert(validRange.array.all!(a => a.type == JSONType.string),
-                        format("Option %s's first valid value is a string, but the rest are not", name));
+                        format("Drop-down option \"%s\"'s first valid value is a string, but the rest are not", name));
                     o[name] =  OptionInfo(idx, OptionType.Dropdown, validRange);
                     break;
 
-                default:
-                    assert(0, format(""));
+                default: break;
                 }
                 break;
 
-            case JSONType.string, JSONType.false_, JSONType.true_:
-// object with {string : bool/(string?)}:                               this is a toggle
-                o[name] = OptionInfo(idx, OptionType.Toggle, validRange);
+            case JSONType.string:
+                switch(validRange.str){
+                case "toggle":
+// object with {string : "toggle"}:                                     this is a toggle
+                    o[name] = OptionInfo(idx, OptionType.Toggle, validRange);
+                    break;
+                default: break;
+                }
+                break;
+
+            case JSONType.object:
+// object with {string : {"commo": [string,]}}:                         this is a commo rose
+                if("commo" in validRange.object){
+                    assert(validRange["commo"].type == JSONType.array && validRange["commo"].array.all!(a => a.type == JSONType.string),
+                        format("Commo option \"%s\"'s value range is not an array of strings", name));
+                    o[name] = OptionInfo(idx, OptionType.Commo, validRange["commo"]);
+                }
                 break;
 
             default:
@@ -189,8 +236,11 @@ OptionInfo[string] _genOptions(JSONValue optionset){
             break;
 
         case JSONType.string:
+            string name = opt.str;
+            assert(name !in o, format("Option \"%s\" is duplicated (%d and %d)", name, idx, o[name].idx));
+            
 // just string:     this is a binding
-            o[opt.str] = OptionInfo(idx, OptionType.Binding, JSONValue(null));
+            o[name] = OptionInfo(idx, OptionType.Binding, JSONValue(null));
             break;
 
         default:
@@ -203,13 +253,8 @@ OptionInfo[string] _genOptions(JSONValue optionset){
 
 
 
-INPUT[] heroSettingsToActions(JSONValue heroSettings, OptionsStrs options){
-    // Would like to use 'memoize!(parseJSON!string)', but it can't resolve the overrides in parseJSON
-    JSONValue p(string s){
-        return parseJSON(s);
-    }
-    alias memParseJson = memoize!p;
-    
+INPUT[] heroSettingsToActions(JSONValue heroSettings, Options options){
+
     INPUT[] inputs;
     inputs.reserve(1000);
     int currHeroIdx = -1;
@@ -231,11 +276,11 @@ INPUT[] heroSettingsToActions(JSONValue heroSettings, OptionsStrs options){
 
             currHeroIdx = inputs.inputHeroSelect(heroName, options.heroList, currHeroIdx);
 
-            OptionInfo[string] optionInfo = (heroName == options.heroList[0]) ?
-                (memParseJson(options.top) ~ memParseJson(options.middle) ~ memParseJson(options.hero[heroName]) ~ memParseJson(options.bottom)).genOptions :
-                (memParseJson(options.top) ~ memParseJson(options.hero[heroName]) ~ memParseJson(options.middle) ~ memParseJson(options.bottom)).genOptions;
+            OptionInfo[string] optionInfos = (heroName == options.heroList[0]) ?
+                (options.top ~ options.middle ~ options.hero[heroName] ~ options.bottom).genOptions :
+                (options.top ~ options.hero[heroName] ~ options.middle ~ options.bottom).genOptions;
 
-            inputs.settingsToActions(settings, optionInfo);
+            inputs.settingsToActions(settings, optionInfos);
         }
     }
 
@@ -243,7 +288,7 @@ INPUT[] heroSettingsToActions(JSONValue heroSettings, OptionsStrs options){
 }
 
 
-int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[string] options /* config*/){
+int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[string] options){
 
     int currentOptionIdx = 0;
 
@@ -253,19 +298,20 @@ int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[str
         assert(setting.object.length == 1);
         string      settingName     = setting.object.keys[0];
         JSONValue   settingValue    = setting.object.values[0];
+        
+        
+        assert(settingName in options,
+            format("Setting \"%s\" not found in options", settingName));
 
         auto optionInfo = options[settingName];
 
         // move to option
         if(optionInfo.idx < currentOptionIdx){
-            for(; currentOptionIdx > optionInfo.idx; currentOptionIdx--){
-                inputs.inputVKey(VK_UP);
-            }
+            inputs.inputVKey(VK_UP, currentOptionIdx - optionInfo.idx);
         } else if(optionInfo.idx > currentOptionIdx){
-            for(; currentOptionIdx < optionInfo.idx; currentOptionIdx++){
-                inputs.inputVKey(VK_DOWN);
-            }
+            inputs.inputVKey(VK_DOWN, optionInfo.idx - currentOptionIdx);
         }
+        currentOptionIdx = optionInfo.idx;
 
         final switch(optionInfo.type) with(OptionType){
         case Slider:
@@ -313,21 +359,7 @@ int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[str
             break;
 
         case Dropdown:
-            // validate
-            string[] menuItems = optionInfo.validRange.array.map!(a => a.str).array;
-            assert(settingValue.type == JSONType.string && menuItems.canFind(settingValue.str),
-                format("Setting \"%s\": must be one of %s, got \"%s\"", settingName, menuItems, settingValue));
-
-            // generate input
-            inputs.inputVKey(VK_SPACE);
-            for(int i = 0; i <= menuItems.length; i++){
-                inputs.inputVKey(VK_UP);
-            }
-            int down = menuItems.countUntil(settingValue.str);
-            for(int i = 0; i < down; i++){
-                inputs.inputVKey(VK_DOWN);
-            }
-            inputs.inputVKey(VK_SPACE);
+            inputs.inputDropdown(settingName, settingValue, optionInfo);
             break;
 
         case Submenu:
@@ -336,39 +368,51 @@ int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[str
             inputs.inputVKey(VK_SPACE);
             inputs.inputVKey(VK_DOWN);
             int suboption = settingsToActions(inputs, settingValue, genOptions(options[settingName].validRange));
-            for(int i = 0; i <= suboption; i++){
-                inputs.inputVKey(VK_UP);
-            }
+            inputs.inputVKey(VK_UP, suboption+1);
             inputs.inputVKey(VK_SPACE);
             break;
 
 
         case Binding:
-            // convert all to same format (2-long array of [string | array-of-string])
-            //   by converting single string to ["str", ""]
-            if(settingValue.type == JSONType.string){
-                settingValue = [settingValue.str, ""];
-            }
+            inputs.inputBinding(settingName, settingValue, optionInfo);
+            break;
 
-            foreach(col, binding; settingValue.array){
-                // validate
-                assert(binding.type == JSONType.string || (binding.type == JSONType.array && binding.array.all!(a => a.type == JSONType.string)),
-                    format("Bindings must be either a single string, or an array of strings"));
-                bool inputRequired =
-                    (binding.type == JSONType.string && binding.str != "") ||
-                    (binding.type == JSONType.array);
+        case Commo:
 
-                // generate input
-                if(inputRequired){
-                    for(int i = 2; i > col; i--){ inputs.inputVKey(VK_LEFT); }
-                    inputs.inputVKey(VK_SPACE);
-                    switch(binding.type){
-                    case JSONType.string:   inputs.inputBinding(binding.str);                                   break;
-                    case JSONType.array:    inputs.inputModifierBinding(binding.array.map!(a => a.str).array);  break;
-                    default: assert(0);
-                    }
-                    for(int i = 2; i > col; i--){ inputs.inputVKey(VK_RIGHT); }
-                }
+            string[] commoOptions = optionInfo.validRange.array.map!(a => a.str).array;
+
+            switch(settingValue.type){
+            case JSONType.string:
+            // string: "selection"              -> just selection from dropdown (no binding)
+                string comm = settingValue.str;
+                assert(commoOptions.canFind(comm),
+                    format("Commo rose message setting \"%s\": must be one of %s, got \"%s\"", settingName, commoOptions, comm));
+
+                inputs.inputVKey(VK_LEFT, 3);
+                inputs.inputDropdown(settingName, settingValue, optionInfo);
+                inputs.inputVKey(VK_RIGHT, 3);
+                break;
+
+            case JSONType.object:
+            // object: {selection : binding}    -> selection from dropdown, then binding
+                assert(settingValue.object.length == 1,
+                    format("Commo rose message-and-binding setting \"%s\": object must be a single '{\"message\" : binding...}' pair)", settingName));
+                string comm = settingValue.object.keys[0];
+                assert(commoOptions.canFind(comm),
+                    format("Commo rose message-and-binding setting \"%s\": message must be one of %s, got \"%s\"", settingName, commoOptions, comm));
+
+                inputs.inputVKey(VK_LEFT, 3);
+                inputs.inputDropdown(settingName, JSONValue(comm), optionInfo);
+                inputs.inputVKey(VK_RIGHT, 3);
+                inputs.inputBinding(settingName, settingValue.object[comm], optionInfo);
+                break;
+
+            case JSONType.array:
+            // array:  [binding...]             -> just binding
+                inputs.inputBinding(settingName, settingValue, optionInfo);
+                break;
+
+            default: break;
             }
             break;
         }
@@ -376,43 +420,80 @@ int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[str
     return currentOptionIdx;
 }
 
+void inputBinding(ref INPUT[] inputs, string settingName, JSONValue settingValue, OptionInfo optionInfo){
+    // convert all to same format (2-long array of [string | array-of-string])
+    //   by converting single string to ["str", ""]
+    if(settingValue.type == JSONType.string){
+        settingValue = [settingValue.str, ""];
+    }
+
+    foreach(col, binding; settingValue.array){
+        // validate
+        assert(binding.type == JSONType.string || (binding.type == JSONType.array && binding.array.all!(a => a.type == JSONType.string)),
+            format("Setting \"%s\": Bindings must be either a single string, or an array of strings", settingName));
+        bool inputRequired =
+            (binding.type == JSONType.string && binding.str != "") ||
+            (binding.type == JSONType.array);
+
+        // generate input
+        if(inputRequired){
+            inputs.inputVKey(VK_LEFT, 2-col);
+            inputs.inputVKey(VK_SPACE);
+            switch(binding.type){
+            case JSONType.string:   inputs.inputKeyBind(binding.str);                                   break;
+            case JSONType.array:    inputs.inputModifierKeyBind(binding.array.map!(a => a.str).array);  break;
+            default: assert(0);
+            }
+            inputs.inputVKey(VK_RIGHT, 2-col);
+        }
+    }
+}
+
+void inputDropdown(ref INPUT[] inputs, string settingName, JSONValue settingValue, OptionInfo optionInfo){
+
+    // validate
+    string[] menuItems = optionInfo.validRange.array.map!(a => a.str).array;
+    assert(settingValue.type == JSONType.string && menuItems.canFind(settingValue.str),
+        format("Setting \"%s\": must be one of %s, got \"%s\"", settingName, menuItems, settingValue));
+
+    // generate input
+    inputs.inputVKey(VK_SPACE);
+    inputs.inputVKey(VK_UP, menuItems.length);
+    inputs.inputVKey(VK_DOWN, menuItems.countUntil(settingValue.str));
+    inputs.inputVKey(VK_SPACE);
+}
+
+
+
 int inputHeroSelect(ref INPUT[] inputs, string hero, string[] heroList, int fromHeroIdx = -1){
 
     int heroIdx = heroList.countUntil(hero);
 
     // Scroll to top of options screen
-    for(int i = 0; i < 9; i++){
+    for(int i = 0; i < 12; i++){
         inputs.inputClickOn(optionsScrollBarTop);
-        inputs.inputNop(3);
+        inputs.inputNop((scrollLoadTime/tick + 1).to!uint);
     }
     inputs.inputScroll(2);
-    inputs.inputNop(3);
-    
+    inputs.inputNop((scrollLoadTime/tick + 1).to!uint);
+
     // Move selection to requested hero
     inputs.inputClickOn(heroSelect);
     inputs.inputMove(heroMenu);
     if(fromHeroIdx == -1){
-        for(int i = 0; i < heroList.length; i++){
-            inputs.inputVKey(VK_UP);
-        }
-        for(int i = 0; i < heroIdx; i++){
-            inputs.inputVKey(VK_DOWN);
-        }
+        inputs.inputVKey(VK_UP, heroList.length);
+        inputs.inputVKey(VK_DOWN, heroIdx);
     } else {
         if(heroIdx < fromHeroIdx){
-            for(; fromHeroIdx > heroIdx; fromHeroIdx--){
-                inputs.inputVKey(VK_UP);
-            }
+            inputs.inputVKey(VK_UP, fromHeroIdx - heroIdx);
         } else if(heroIdx > fromHeroIdx){
-            for(; fromHeroIdx < heroIdx; fromHeroIdx++){
-                inputs.inputVKey(VK_DOWN);
-            }
+            inputs.inputVKey(VK_DOWN, heroIdx - fromHeroIdx);
         }
     }
 
     // Select hero, wait for menu to load
     inputs.inputVKey(VK_SPACE);
-    inputs.inputNop(30);
+    inputs.inputNop((menuLoadTime/tick + 1).to!uint);
     inputs.inputVKey(VK_DOWN);
     return heroIdx;
 }
@@ -445,12 +526,14 @@ void inputScroll(ref INPUT[] inputs, int n){
     }
 }
 
-void inputVKey(ref INPUT[] inputs, ushort vk){
-    inputs ~= INPUTk(KEYBDINPUT(vk, 0, 0, 0, 0));
-    inputs ~= INPUTk(KEYBDINPUT(vk, 0, KEYEVENTF_KEYUP, 0, 0));
+void inputVKey(ref INPUT[] inputs, ushort vk, uint repeat = 1){
+    for(uint i = 0; i < repeat; i++){
+        inputs ~= INPUTk(KEYBDINPUT(vk, 0, 0, 0, 0));
+        inputs ~= INPUTk(KEYBDINPUT(vk, 0, KEYEVENTF_KEYUP, 0, 0));
+    }
 }
 
-void inputBinding(ref INPUT[] inputs, string binding){
+void inputKeyBind(ref INPUT[] inputs, string binding){
     string b = binding.toUpper;
     if(b in vkeyCodeOf){
         inputs.inputVKey(vkeyCodeOf[b]);
@@ -462,7 +545,7 @@ void inputBinding(ref INPUT[] inputs, string binding){
 }
 
 
-void inputModifierBinding(ref INPUT[] inputs, string[] sequence){
+void inputModifierKeyBind(ref INPUT[] inputs, string[] sequence){
     ushort[string] modifiers = [
         "SHIFT"                 : VK_SHIFT,
         "CONTROL"               : VK_CONTROL,
@@ -471,13 +554,13 @@ void inputModifierBinding(ref INPUT[] inputs, string[] sequence){
     ];
 
     if(sequence.length == 1){
-        inputs.inputBinding(sequence[0]);
+        inputs.inputKeyBind(sequence[0]);
     } else {
         string b = sequence[0].toUpper;
         assert(b in modifiers,
             format("binding modifiers must be \"shift\", \"control\", or \"alt\", got %s", b));
         inputs ~= INPUTk(KEYBDINPUT(modifiers[b], 0, 0, 0, 0));
-        inputModifierBinding(inputs, sequence[1..$]);
+        inputModifierKeyBind(inputs, sequence[1..$]);
         inputs ~= INPUTk(KEYBDINPUT(modifiers[b], 0, KEYEVENTF_KEYUP, 0, 0));
     }
 }
@@ -534,307 +617,6 @@ POINT cursorPos(){
 
 
 
-
-struct OptionsStrs {
-    string          top;
-    string          middle;
-    string          bottom;
-    string[]        heroList;
-    string[string]  hero;
-}
-
-OptionsStrs loadOptions(){
-    return OptionsStrs(
-        q{[
-            {"Sensitivity":                         [0.01, 100]},
-            {"Invert look":                         "toggle"},
-            {"Horizontal sensitivity":              [0, 100]},
-            {"Vertical sensitivity":                [0, 100]},
-            {"Controller Advanced": [
-                    {"Aim smoothing":               [0, 100]},
-                    {"Aim ease in":                 [0, 100]},
-                    {"Invert vertical look":        "toggle"},
-                    {"Invert horizontal look":      "toggle"},
-                    {"Vibration":                   "toggle"},
-                    {"Swap movement/look sticks":   "toggle"},
-                    {"Legacy sticks":               "toggle"},
-                    {"Force keyboard/mouse user interface":   "toggle"},
-                    {"Aim technique":               ["Dual-zone", "Exponential ramp", "Linear ramp"]},
-                ]},
-            {"Reticle type":                        ["Default", "Circle", "Crosshairs", "Circle and crosshairs", "Dot"]},
-            {"Reticle Advanced": [
-                    {"Show Accuracy":               "toggle"},
-                    {"Color":                       ["White", "Green", "Cyan", "Red", "Magenta", "Yellow", "Black", "Orange", "Pink", "Blue", "Purple", "Khaki", "DarkGreen"]},
-                    {"Thickness":                   [1, 15]},
-                    {"Crosshair length":            [0, 50]},
-                    {"Center gap":                  [0, 100]},
-                    {"Opacity":                     [0, 100]},
-                    {"Outline opacity":             [0, 100]},
-                    {"Dot size":                    [2, 10]},
-                    {"Dot opacity":                 [0, 100]},
-                    {"Scale with resolution":       "toggle"},
-                ]},
-            {"Allied health bars":                  ["Default", "Always", "Off"]},
-            {"Show friendly outlines":              ["Default", "Off", "Occluded", "Always"]},
-        ]},
-        q{[
-            "Forward",
-            "Back",
-            "Left",
-            "Right",
-            "Crouch",
-            "Toggle crouch",
-            "Jump",
-
-            "Ability 1",
-            "Ability 2",
-            "Ability 3",
-            "Interact",
-            "Primary fire",
-            "Secondary fire",
-            "Equip weapon 1",
-            "Equip weapon 2",
-            "Quick melee",
-            "Reload",
-            "Next weapon",
-            "Previous weapon",
-
-            "Communication menu",
-            "Emote (default)",
-            "Hello",
-            "Need healing/buffs",
-            "Group up",
-            "Ultimate status",
-            "Voice line (default)",
-            "Acknowledge",
-            "Thanks",
-
-            "Emote menu",
-            "Emote right",
-            "Emote down",
-            "Emote left",
-
-            "Voice line menu",
-            "Voice line right",
-            "Voice line down",
-            "Voice line left",
-
-            "Spray menu",
-            "Spray (default)",
-            "Spray right",
-            "Spray down",
-            "Spray left",
-
-            "All chat",
-            "Hide chat",
-            "Open chat",
-            "Reply to whisper",
-            "Team chat",
-            "Voice chat: Push to talk",
-            "Voice chat: Toggle mic mute",
-        ]},
-        q{[
-            "Capture highlight",
-            "Capture highlight - Slot 1",
-            "Capture highlight - Slot 2",
-            "Capture highlight - Slot 3",
-            "Custom game lobby",
-            "Endorse players",
-            "Hero information",
-            "Hero select",
-            "Moderator - Pause game",
-            "Open workshop editor",
-            "Open workshop inspector",
-            "Restart custom game",
-            "Scoreboard",
-            "Social menu",
-            "Social menu channels",
-            "Take screenshot",
-            "Toggle fps display",
-            "Toggle netgraph",
-            "Toggle ui",
-        ]},
-        [
-            "all heroes",
-            "ana",
-            "ashe",
-            "baptiste",
-            "bastion",
-            "brigitte",
-            "dva",
-            "doomfist",
-            "echo",
-            "genji",
-            "hanzo",
-            "junkrat",
-            "lucio",
-            "mccree",
-            "mei",
-            "mercy",
-            "moira",
-            "orisa",
-            "pharah",
-            "reaper",
-            "reinhardt",
-            "roadhog",
-            "sigma",
-            "soldier",
-            "sombra",
-            "symmetra",
-            "torbjorn",
-            "tracer",
-            "widowmaker",
-            "winston",
-            "wreckingball",
-            "zarya",
-            "zenyatta",
-        ],
-        ["all heroes": q{[
-            "Spectate player 1",
-            "Spectate player 2",
-            "Spectate player 3",
-            "Spectate player 4",
-            "Spectate player 5",
-            "Spectate player 6",
-            "Spectate player 7",
-            "Spectate player 8",
-            "Spectate player 9",
-            "Spectate toggle overlay",
-            "Spectate toggle pause",
-            "Spectate player 10",
-            "Spectate player 11",
-            "Spectate player 12",
-            "Objective camera",
-            "Spectate next",
-            "Spectate previous",
-            "Spectate self",
-            "Toggle normal/simple 3p spectator camera",
-            "Spectate toggle 3p",
-            "Spectate toggle simple 3p camera side",
-            "Static camera 1",
-            "Static camera 2",
-            "Static camera 3",
-            "Static camera 4",
-            "Static camera 5",
-            "Static camera 6",
-            "Static camera 7",
-            "Static camera 8",
-            "Static camera 9",
-            "Show health bars",
-            "Spectate lock on",
-            "Spectate target under reticle",
-            "Disable camera blending",
-            "Modify fov",
-            "Move fast",
-            "Move slow",
-            "Move down",
-            "Move up",
-            "Decrease speed / zoom out",
-            "Increase speed / zoom in",
-
-            "Decrease playback speed",
-            "Increase playback speed",
-            "Jump to start",
-            "Media controls",
-            "Replay back",
-            "Replay forward",
-        ]},
-        "ana": q{[
-            {"Toggle zoom":                             "toggle"},
-            {"Relative aim sensitivity while zoomed":   [0.00, 100]},
-            {"Recoil recovery aim compensation":        "toggle"},
-            {"Nano boost requires target confirmation": "toggle"},
-            {"Nano boost sensitivity":                  [10, 100]},
-        ]},
-        "ashe": q{[
-            {"Toggle zoom":                             "toggle"},
-            {"Relative aim sensitivity while zoomed":   [0.00, 100]},
-            {"Recoil recovery aim compensation":        "toggle"},
-        ]},
-        "baptiste": q{[
-            {"Recoil recovery aim compensation":        "toggle"},
-            {"Automatic reload":                        "toggle"},
-        ]},
-        "bastion": q{[]},
-        "brigitte": q{[
-            {"Toggle barrier":                          "toggle"},
-            {"Repair pack sensitivity":                 [10, 100]},
-        ]},
-        "dva": q{[
-            {"Toggle defense matrix":                   "toggle"},
-            {"Hold boosters":                           "toggle"},
-        ]},
-        "doomfist": q{[]},
-        "echo": q{[
-            {"Duplicate requires target confirmation":  "toggle"},
-            {"Duplicate sensitivity":                   [10, 100]},
-            {"Hold for flight":                         "toggle"},
-        ]},
-        "genji": q{[
-            {"Automatically climb walls":               "toggle"},
-        ]},
-        "hanzo": q{[
-            {"Automatically climb walls":               "toggle"},
-        ]},
-        "junkrat": q{[
-            {"Rip-tire Automatically climbs walls":     "toggle"},
-        ]},
-        "lucio": q{[
-            {"Hold to crossfade":                       "toggle"},
-            {"Allow backwards wallride":                "toggle"},
-        ]},
-        "mccree": q{[
-            {"Recoil recovery aim compensation":        "toggle"},
-        ]},
-        "mei": q{[]},
-        "mercy": q{[
-                {"Toggle beam connection":              "toggle"},
-                {"Guardian angel prefers beam target":  "toggle"},
-                {"Toggle guardian angel":               "toggle"},
-                {"Guardian angel sensitivity":          [10, 100]},
-                {"Beam sensitivity":                    [10, 100]},
-        ]},
-        "moira": q{[]},
-        "orisa": q{[]},
-        "pharah": q{[]},
-        "reaper": q{[]},
-        "reinhardt": q{[
-            {"Toggle barrier":                          "toggle"},
-            {"Movement relative to camera during barrier free look": "toggle"},
-        ]},
-        "roadhog": q{[]},
-        "sigma": q{[
-            {"Reload recalls barrier":                  "toggle"},
-            {"Toggle barrier":                          "toggle"},
-        ]},
-        "soldier": q{[
-            {"Hold to sprint":                          "toggle"},
-        ]},
-        "sombra": q{[
-            {"Hack sensitivity":                        [10, 100]},
-        ]},
-        "symmetra": q{[]},
-        "torbjorn": q{[]},
-        "tracer": q{[]},
-        "widowmaker": q{[
-            {"Toggle zoom":                             "toggle"},
-            {"Relative aim sensitivity while zoomed":   [0.00, 100]},
-            {"Grappling hook sensitivity":              [10, 100]},
-            {"Recoil recovery aim compensation":        "toggle"},
-        ]},
-        "winston": q{[]},
-        "wreckingball": q{[
-            {"Toggle grappling claw":                   "toggle"},
-        ]},
-        "zarya": q{[
-            {"Projected barrier sensitivity":           [10, 100]},
-        ]},
-        "zenyatta": q{[
-            {"Orb of harmony sensitivity":              [10, 100]},
-            {"Orb of discord sensitivity":              [10, 100]},
-        ]},
-    ]);
-}
 
 
 
