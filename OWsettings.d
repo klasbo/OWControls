@@ -84,7 +84,7 @@ void main(string[] args){
     
     sw.start();
     
-    auto j = "options.json".readText.tryParseJSON;
+    auto j = "options.json".readText.parseJSON;
     auto options = Options(
         j["top"],
         j["middle"],
@@ -93,7 +93,7 @@ void main(string[] args){
         j["hero"].object
     );
     
-    auto inputs = heroSettingsToActions(inputFile.readText.tryParseJSON, options);
+    auto inputs = heroSettingsToActions(inputFile.readText.parseJSON, options);
     
     sw.stop();    
     auto loadTime = sw.peek.split!("msecs", "usecs");
@@ -141,20 +141,24 @@ struct OptionInfo {
 }
 
 
-JSONValue tryParseJSON(string s){
+JSONValue parseJSON(string s){
     JSONValue v;
     try {
-        v = parseJSON(s);
+        v = std.json.parseJSON(s);
     } catch(Exception e){
-        e.msg.writeln;
+        string msg;
         auto matches = e.msg.matchFirst(r"^.+?Line (\d+?):(\d+?)\)");
         if(matches.length == 3){
             auto line = matches[1].to!int;
             auto col  = matches[2].to!int;
-            s.splitLines[line-1].writeln;
-            writeln(" ".repeat(col-1).reduce!"a~b", "^");
+            msg = format("%s\n%s\n%s%s\n", 
+                e.msg,
+                s.splitLines[line-1],
+                " ".repeat(col-1).reduce!"a~b", "^");
+        } else {
+            msg = e.msg;
         }
-        throw e;
+        throw new Exception(msg);
     }
     return v;
 }
