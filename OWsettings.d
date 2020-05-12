@@ -44,6 +44,7 @@ import std.string;
 auto tick           = 17.msecs;
 auto menuLoadTime   = 800.msecs;
 auto scrollLoadTime = 100.msecs;
+auto coords         = Coordinates();
 
 enum Hotkey {
     HK1,
@@ -51,12 +52,15 @@ enum Hotkey {
     HK3,
 }
 
+struct Coordinates {
+    POINT heroSelect             = POINT(46080, 10240);
+    POINT heroMenu               = POINT(46080, 13200);
+    POINT optionsMenu            = POINT(20500, 31850);
+    POINT optionsTop             = POINT(15350, 15930);
+    POINT optionsScrollBarTop    = POINT(53247, 9250 );
+}
 
-auto heroSelect             = POINT(46080, 10240);
-auto heroMenu               = POINT(46080, 13200);
-auto optionsMenu            = POINT(20500, 31850);
-auto optionsTop             = POINT(15350, 15930);
-auto optionsScrollBarTop    = POINT(53247, 9103 );
+
 
 struct Options {
     JSONValue           top;
@@ -75,7 +79,7 @@ void main(string[] args){
     getopt(args,
         std.getopt.config.required,
         "i|input", &inputFile,
-        "o|options", &optionsFile
+        "o|options", &optionsFile,
     );
     
     if(optionsFile == ""){
@@ -673,15 +677,15 @@ int inputHeroSelect(ref INPUT[] inputs, string hero, string[] heroList, int from
 
     // Scroll to top of options screen
     for(int i = 0; i < 12; i++){
-        inputs.inputClickOn(optionsScrollBarTop);
+        inputs.inputClickOn(coords.optionsScrollBarTop);
         inputs.inputNop((scrollLoadTime/tick + 1).to!uint);
     }
     inputs.inputScroll(2);
     inputs.inputNop((scrollLoadTime/tick + 1).to!uint);
 
     // Move selection to requested hero
-    inputs.inputClickOn(heroSelect);
-    inputs.inputMove(heroMenu);
+    inputs.inputClickOn(coords.heroSelect);
+    inputs.inputMove(coords.heroMenu);
     if(fromHeroIdx == -1){
         inputs.inputVKey(VK_UP, heroList.length);
         inputs.inputVKey(VK_DOWN, heroIdx);
