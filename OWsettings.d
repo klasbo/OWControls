@@ -69,12 +69,18 @@ struct Options {
 void main(string[] args){
 
     string inputFile;
+    string optionsFile;
     auto sw = StopWatch(AutoStart.no);
 
     getopt(args,
         std.getopt.config.required,
         "i|input", &inputFile,
+        "o|options", &optionsFile
     );
+    
+    if(optionsFile == ""){
+        optionsFile = dirEntries("options", SpanMode.shallow).array[$-1];
+    }
 
     RegisterHotKey(null, Hotkey.HK1, 0x4000, VK_F6);
     RegisterHotKey(null, Hotkey.HK2, 0x4000, VK_F7);
@@ -84,7 +90,7 @@ void main(string[] args){
     
     sw.start();
     
-    auto j = "options.json".readText.parseJSON;
+    auto j = optionsFile.readText.parseJSON;
     auto options = Options(
         j["top"],
         j["middle"],
