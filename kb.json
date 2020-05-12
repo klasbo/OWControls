@@ -24,7 +24,7 @@
         {"Crouch":                          "space"},
         {"Toggle crouch":                   ""},
 
-        {"Jump":                            "r shift"},
+        {"Jump":                            "rshift"},
         {"Ability 1":                       "n"},
         {"Ability 2":                       "oem_7"},
         {"Ability 3":                       "i"},
@@ -201,9 +201,6 @@
     ]},
     {"winston": [
         {"Quick melee":                             ["mouse right click", "1"]},
-    ]},
-    {"wreckingball": [
-        {"Toggle grappling claw":                   true},
     ]},
     {"zenyatta": [
         {"Ability 1":                               "oem_7"},

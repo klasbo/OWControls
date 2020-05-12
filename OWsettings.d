@@ -541,8 +541,8 @@ void inputKeyBind(ref INPUT[] inputs, string binding){
     string b = binding.toUpper;
     if(b in vkeyCodeOf){
         inputs.inputVKey(vkeyCodeOf[b]);
-    } else if(b in mouseInputOf){
-        inputs ~= mouseInputOf[b];
+    } else if(b in inputOf){
+        inputs ~= inputOf[b];
     } else {
         assert(false, format("Unrecognized keybind input: \"%s\"", binding));
     }
@@ -627,7 +627,7 @@ POINT cursorPos(){
 
 
 ushort[string] vkeyCodeOf;
-INPUT[][string] mouseInputOf;
+INPUT[][string] inputOf;
 static this(){
     vkeyCodeOf = [
         "LBUTTON"               : VK_LBUTTON,
@@ -642,8 +642,9 @@ static this(){
         "RETURN"                : VK_RETURN,
         "ENTER"                 : VK_RETURN,
         "SHIFT"                 : VK_SHIFT,
-        //"CONTROL"               : VK_CONTROL,
-        //"MENU"                  : VK_MENU,
+        "CONTROL"               : VK_CONTROL,
+        "ALT"                   : VK_MENU,
+        "MENU"                  : VK_MENU,
         "PAUSE"                 : VK_PAUSE,
         "CAPITAL"               : VK_CAPITAL,
         "KANA"                  : VK_KANA,
@@ -723,7 +724,7 @@ static this(){
         "NUMLOCK"               : VK_NUMLOCK,
         "SCROLL"                : VK_SCROLL,
         "LSHIFT"                : VK_LSHIFT,
-        "RSHIFT"                : VK_RSHIFT,
+        //"RSHIFT"                : VK_RSHIFT, // requires scancode to work properly, see inputOf map below
         "LCONTROL"              : VK_LCONTROL,
         "RCONTROL"              : VK_RCONTROL,
         "LALT"                  : VK_LMENU,
@@ -809,7 +810,7 @@ static this(){
         "Y"                     : cast(ushort)'Y',
         "Z"                     : cast(ushort)'Z',
     ];
-    mouseInputOf = [
+    inputOf = [
         "MOUSE LEFT CLICK" : [
             INPUT(INPUT_MOUSE, MOUSEINPUT(0, 0, 0, MOUSEEVENTF_LEFTDOWN, 0, 0)),
             INPUT(INPUT_MOUSE, MOUSEINPUT(0, 0, 0, MOUSEEVENTF_LEFTUP, 0, 0))
@@ -842,13 +843,9 @@ static this(){
         "MOUSE WHEEL RIGHT" : [
             INPUT(INPUT_MOUSE, MOUSEINPUT(0, 0, -1, 0x01000, 0)),
         ],
-        "R SHIFT": [
-            INPUTk(KEYBDINPUT(VK_RSHIFT, 0, KEYEVENTF_EXTENDEDKEY, 0, 0)),
-            INPUTk(KEYBDINPUT(VK_RIGHT, 0, 0, 0, 0)),
-            INPUTk(KEYBDINPUT(VK_RIGHT, 0, KEYEVENTF_KEYUP, 0, 0)),
-            INPUTk(KEYBDINPUT(VK_LEFT, 0, 0, 0, 0)),
-            INPUTk(KEYBDINPUT(VK_LEFT, 0, KEYEVENTF_KEYUP, 0, 0)),
-            INPUTk(KEYBDINPUT(VK_RSHIFT, 0, KEYEVENTF_KEYUP | KEYEVENTF_EXTENDEDKEY, 0, 0)),
+        "RSHIFT": [
+            INPUTk(KEYBDINPUT(VK_RSHIFT, 0x36, KEYEVENTF_EXTENDEDKEY, 0, 0)),
+            INPUTk(KEYBDINPUT(VK_RSHIFT, 0x36, KEYEVENTF_KEYUP | KEYEVENTF_EXTENDEDKEY, 0, 0)),
         ]
 
 
