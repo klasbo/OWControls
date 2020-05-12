@@ -121,7 +121,39 @@ void main(string[] args){
     }
 }
 
-// "Reticle advanced"-"Show accuracy" setting makes "center gap" setting unavailable when toggled on.
+
+enum OptionAvailable {
+    no,
+    yes,
+    unknown,
+}
+
+struct OptionState {
+    
+    string                      currHero;
+    OptionAvailable[string]     crosshairLengthAvailable;
+    OptionAvailable[string]     centerGapAvailable;
+    bool                        restoredDefaults;
+    
+    this(string[] heroList){
+        currHero = heroList[0];
+        foreach(hero; heroList){
+            crosshairLengthAvailable[hero]  = OptionAvailable.unknown;
+            centerGapAvailable[hero]        = OptionAvailable.unknown;
+        }
+    }
+}
+
+void restoreDefaults(ref OptionState os){
+    os.currHero = "all heroes";
+    os.restoredDefaults = true;
+    foreach(ref v; os.crosshairLengthAvailable){
+        v = OptionAvailable.yes;
+    }
+    foreach(ref v; os.centerGapAvailable){
+        v = OptionAvailable.no;
+    }
+}
 
 
 
@@ -262,10 +294,26 @@ INPUT[] heroSettingsToActions(JSONValue heroSettings, Options options){
     INPUT[] inputs;
     inputs.reserve(1000);
     int currHeroIdx = -1;
+    auto optionState = OptionState(options.heroList);
 
     assert(heroSettings.type == JSONType.array,
         format("Settings top-level container must be an array (to preserve ordering of inputs), got %s", heroSettings.type));
+    assert(heroSettings.array.length > 0,
+        format("Settings array is empty"));
+        
+    if(heroSettings.array[0].type == JSONType.string){
+        if(["RESET DEFAULTS", "RESET", "RESTORE DEFAULTS", "RESTORE", "DEFAULT", "UNBINDALL"].canFind(heroSettings.array[0].str.toUpper)){
+            inputs.inputVKey(VK_BACK);
+            inputs.inputVKey(VK_RETURN);
+            heroSettings.array = heroSettings.array[1..$];
+            optionState.restoreDefaults();
+        } else {
+            assert(0, format("Unrecognized string \"%s\", did you mean \"Restore defaults\"?", heroSettings.array[0].str));
+        }
+    }
+        
     foreach(heroSettingIdx, heroSetting; heroSettings.array){
+    
         assert(heroSetting.type == JSONType.object  &&  heroSetting.object.length == 1,
             format("Per-hero settings must be a single object of the form '\"heroName\" : [settingsArray]'"));
 
@@ -283,8 +331,9 @@ INPUT[] heroSettingsToActions(JSONValue heroSettings, Options options){
             OptionInfo[string] optionInfos = (heroName == options.heroList[0]) ?
                 (options.top ~ options.middle ~ options.hero[heroName] ~ options.bottom).genOptions :
                 (options.top ~ options.hero[heroName] ~ options.middle ~ options.bottom).genOptions;
-
-            inputs.settingsToActions(settings, optionInfos);
+                
+            optionState.currHero = heroName;
+            inputs.settingsToActions(settings, optionInfos, optionState);
         }
     }
 
@@ -292,10 +341,152 @@ INPUT[] heroSettingsToActions(JSONValue heroSettings, Options options){
 }
 
 
-int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[string] options){
+void badSettingCheck(ref OptionState os, string settingName, JSONValue settingValue, OptionInfo[string] options){
+    /*
+    Settings changes can be made in the allheroes or the hero-specific override menu
+    Changes can make the hero override the same as - or different from - the allheroes setting
+    Changes in the allheroes menu change settings in hero overrides when the values were the same
+        (changes are only registered when the menu is closed (another menu opened))
+    In other words: changes in the allheroes menu can "override hero overrides" if they started with the same value
+    
+    Greyed-out settings:
+        Some settings can grey-out options, and we want to disallow attempts to change these        
+        - Errors are issued if the values of these settings are known to be bad
+        - Warnings are issued if the values of these settings are unknown
+        Greyed-out options will change the amount of scrolling needed to reach the options below them
+            The easiest way to deal with this is to issue the same errors/warnings
+            (Easier, because otherwise it requires a two-way dependence between 
+                a) knowing the where the options are, and b) knowing what settings have been changed)
+            
+    Toggle-type settings:
+        Changing toggle settings can have unknown effects, since 
+            a) there is no way to control the difference between enabling and disabling a setting
+            b) there is no way to know what the existing value is, unless all settings are reset to defaults
+        The only changes that have known effects are when 
+            1) settings have been reset to defaults, and
+            2) the toggle is flipped only when it is something other than the default, and
+            3) the toggle has been flipped only once
+        To guarantee the desired effect of a toggle change, the decision must be based on
+            1) if all settings have been reverted to defaults
+            2) the current state of the setting (how many times this setting has been toggled)
+            3) changes to allheroes overriding of hero-overrides (when the value of the toggles match)
+        Again, fixing this requires a two-way dependency between
+            a) knowing what the current setting value is, and b) knowing the decision to flip the toggle
+        Since the correct solution is to fix the input (control) end to know what the outcome of changing the setting will be,
+            the only case it makes sense to put in the effort to check for is when changing toggles without having reset to defaults,
+            especially when considering that the two major use cases for the program are full settings and overriding keybindings.
+        - Warnings are issued when toggles are being used without having reset all settings to defaults
+    */
+
+    // (consts)
+    string[] noCrosshairLengthReticles = ["Circle", "Dot"];
+    
+    
+    // Update what options are grey
+    
+    void setGreyState(string name, ref OptionAvailable[string] opt, lazy bool cond){
+        if(settingName == name){
+            auto avail = cond ? OptionAvailable.no : OptionAvailable.yes;
+            if(os.currHero == "all heroes"){
+                // changes to "all heroes" changes all non-overridden heroes too
+                foreach(k, ref v; opt){
+                    if(k != "all heroes" && opt["all heroes"] == v){
+                        v = avail;
+                    }
+                }            
+            }
+            opt[os.currHero] = avail;
+        }
+    }
+    
+    setGreyState("Reticle type",  os.crosshairLengthAvailable, noCrosshairLengthReticles.canFind(settingValue.str));
+    setGreyState("Show Accuracy", os.centerGapAvailable,       settingValue.boolean);
+    
+
+    
+    // Check if setting tries to modify grey option (or occluded-by-brey option)
+
+    string greyOption = "Crosshair length";
+    if(greyOption in options  &&  options[settingName].idx >= options[greyOption].idx){
+        final switch(os.crosshairLengthAvailable[os.currHero]) with(OptionAvailable){
+        case no:
+            writefln(
+                "ERROR:\n" ~ 
+                "  Hero \"%s\":\n" ~ 
+                "    Option \"%s\" is unavailable since the option \"%s\" is greyed out.\n" ~ 
+                "    Reason: Option \"Reticle type\" was set to one of %s.\n" ~ 
+                "    Solution: \n" ~ 
+                "      Set the reticle type only after changing this setting.\n" ~ 
+                "      If you want to set the reticle type to one of %s, set it \n" ~ 
+                "      to \"Default\" before changing this setting, then to the desired type after.\n",
+                os.currHero, settingName, greyOption, noCrosshairLengthReticles, noCrosshairLengthReticles);
+            break;
+        case unknown:
+            writefln(
+                "WARNING:\n" ~ 
+                "  Hero \"%s\":\n" ~ 
+                "    Option \"%s\" might be unavailable since the option \"%s\" might be greyed out.\n" ~ 
+                "    Reason:\n" ~ 
+                "      This hero might have hero-specific overrides.\n" ~ 
+                "    Solution:\n" ~ 
+                "      Assign a value to the option \"Reticle type\" to this hero before changing this setting.\n", 
+                os.currHero, settingName, greyOption);
+            break;
+        case yes:
+            // (setting is available => no warnings)
+            break;
+        }
+    }
+    
+    greyOption = "Center gap";
+    if(greyOption in options  &&  options[settingName].idx >= options[greyOption].idx){
+        final switch(os.centerGapAvailable[os.currHero]) with(OptionAvailable){
+        case no:
+            writefln(
+                "ERROR:\n" ~ 
+                "  Hero \"%s\":\n" ~ 
+                "    Option \"%s\" is unavailable since the option \"%s\" is greyed out.\n" ~ 
+                "    Reason: Option \"Show accuracy\" was enabled.\n" ~ 
+                "    Solution: \n" ~ 
+                "      Disable \"Show accuracy\" before changing this setting, then re-enable it after, if desired.\n" ~ 
+                "      Note: Resetting to default settings enables \"Show accuracy\" for all heroes\n",
+                os.currHero, settingName, greyOption);
+            break;
+        case unknown:
+            writefln(
+                "WARNING:\n" ~ 
+                "  Hero \"%s\":\n" ~ 
+                "    Option \"%s\" might be unavailable since the option \"%s\" might be greyed out.\n" ~ 
+                "    Reason:\n" ~                 
+                "      This hero might have a hero-specific override for \"Show accuracy\".\n" ~ 
+                "    Solution: \n" ~ 
+                "      ???.\n",
+                os.currHero, settingName, greyOption);
+            break;
+        case yes:
+            // (setting is available => no warnings)
+            break;
+        }
+    }
+    
+    if(options[settingName].type == OptionType.Toggle){
+        if(!os.restoredDefaults){
+            writefln(
+                "WARNING:\n"~
+                "  Hero \"%s\":\n" ~
+                "    Toggle option \"%s\" used without resetting to defaults\n",
+                os.currHero, settingName
+            );
+        }
+    }
+}
+
+
+
+
+int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[string] options, ref OptionState optionState){
 
     int currentOptionIdx = 0;
-
 
     foreach(setting; heroSettings.array){
         assert(setting.type == JSONType.object);
@@ -371,7 +562,7 @@ int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[str
             // generate input
             inputs.inputVKey(VK_SPACE);
             inputs.inputVKey(VK_DOWN);
-            int suboption = settingsToActions(inputs, settingValue, genOptions(options[settingName].validRange));
+            int suboption = settingsToActions(inputs, settingValue, genOptions(options[settingName].validRange), optionState);
             inputs.inputVKey(VK_UP, suboption+1);
             inputs.inputVKey(VK_SPACE);
             break;
@@ -382,7 +573,6 @@ int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[str
             break;
 
         case Commo:
-
             string[] commoOptions = optionInfo.validRange.array.map!(a => a.str).array;
 
             switch(settingValue.type){
@@ -420,6 +610,8 @@ int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[str
             }
             break;
         }
+                
+        badSettingCheck(optionState, settingName, settingValue, options);
     }
     return currentOptionIdx;
 }
