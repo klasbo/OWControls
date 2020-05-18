@@ -35,21 +35,13 @@ __gshared ushort    performInputHotkey_vkey;
 __gshared string    abortInputHotkey_str    = "BREAK";
 __gshared ushort    abortInputHotkey_vkey;
 
-auto coords         = Coordinates();
-
-enum Action {
-    PerformInput,
-    AbortInput,
-}
 
 struct Coordinates {
     POINT heroSelect             = POINT(46080, 10240);
     POINT heroMenu               = POINT(46080, 13200);
-    POINT optionsMenu            = POINT(20500, 31850);
-    POINT optionsTop             = POINT(15350, 15930);
     POINT optionsScrollBarTop    = POINT(53247, 9250 );
 }
-
+auto coords = Coordinates();
 
 
 struct Options {
@@ -59,7 +51,6 @@ struct Options {
     string[]            heroList;
     JSONValue[string]   hero;
 }
-
 
 
 void main(string[] args){
@@ -196,6 +187,10 @@ void main(string[] args){
     }
 }
 
+enum Action {
+    PerformInput,
+    AbortInput,
+}
 void hotkeyReader_thr(){
     RegisterHotKey(null, Action.PerformInput, 0x4000, performInputHotkey_vkey);
     RegisterHotKey(null, Action.AbortInput,   0x4000, abortInputHotkey_vkey);
@@ -240,39 +235,11 @@ void ticker_thr(){
 }
 
 
-enum OptionAvailable {
-    no,
-    yes,
-    unknown,
-}
 
-struct OptionState {
-    
-    string                      currHero;
-    OptionAvailable[string]     crosshairLengthAvailable;
-    OptionAvailable[string]     centerGapAvailable;
-    bool                        restoredDefaults;
-    
-    this(string[] heroList){
-        currHero = heroList[0];
-        foreach(hero; heroList){
-            crosshairLengthAvailable[hero]  = OptionAvailable.unknown;
-            centerGapAvailable[hero]        = OptionAvailable.unknown;
-        }
-    }
-}
 
-void restoreDefaults(ref OptionState os){
-    os.currHero = "all heroes";
-    os.restoredDefaults = true;
-    foreach(ref v; os.crosshairLengthAvailable){
-        v = OptionAvailable.yes;
-    }
-    foreach(ref v; os.centerGapAvailable){
-        v = OptionAvailable.no;
-    }
-}
-
+//--------------------------------------
+// OPTIONS : creating OptionInfo[string] from file
+//--------------------------------------
 
 
 enum OptionType {
@@ -288,29 +255,6 @@ struct OptionInfo {
     int         idx;
     OptionType  type;
     JSONValue   validRange;
-}
-
-
-JSONValue parseJSON(string s){
-    JSONValue v;
-    try {
-        v = std.json.parseJSON(s);
-    } catch(Exception e){
-        string msg;
-        auto matches = e.msg.matchFirst(r"^.+?Line (\d+?):(\d+?)\)");
-        if(matches.length == 3){
-            auto line = matches[1].to!int;
-            auto col  = matches[2].to!int;
-            msg = format("%s\n%s\n%s%s\n", 
-                e.msg,
-                s.splitLines[line-1],
-                " ".repeat(col-1).reduce!"a~b", "^");
-        } else {
-            msg = e.msg;
-        }
-        throw new Exception(msg);
-    }
-    return v;
 }
 
 alias genOptions = memoize!_genOptions;
@@ -407,6 +351,11 @@ OptionInfo[string] _genOptions(JSONValue optionset){
 
 
 
+//--------------------------------------
+// SETTINGS : creating INPUT[] from file
+//--------------------------------------
+
+
 INPUT[] heroSettingsToActions(JSONValue heroSettings, Options options){
 
     INPUT[] inputs;
@@ -468,149 +417,6 @@ INPUT[] heroSettingsToActions(JSONValue heroSettings, Options options){
 
     return inputs;
 }
-
-
-void badSettingCheck(ref OptionState os, string settingName, JSONValue settingValue, OptionInfo[string] options){
-    /*
-    Settings changes can be made in the allheroes or the hero-specific override menu
-    Changes can make the hero override the same as - or different from - the allheroes setting
-    Changes in the allheroes menu change settings in hero overrides when the values were the same
-        (changes are only registered when the menu is closed (another menu opened))
-    In other words: changes in the allheroes menu can "override hero overrides" if they started with the same value
-    
-    Greyed-out settings:
-        Some settings can grey-out options, and we want to disallow attempts to change these        
-        - Errors are issued if the values of these settings are known to be bad
-        - Warnings are issued if the values of these settings are unknown
-        Greyed-out options will change the amount of scrolling needed to reach the options below them
-            The easiest way to deal with this is to issue the same errors/warnings
-            (Easier, because otherwise it requires a two-way dependence between 
-                a) knowing the where the options are, and b) knowing what settings have been changed)
-            
-    Toggle-type settings:
-        Changing toggle settings can have unknown effects, since 
-            a) there is no way to control the difference between enabling and disabling a setting
-            b) there is no way to know what the existing value is, unless all settings are reset to defaults
-        The only changes that have known effects are when 
-            1) settings have been reset to defaults, and
-            2) the toggle is flipped only when it is something other than the default, and
-            3) the toggle has been flipped only once
-        To guarantee the desired effect of a toggle change, the decision must be based on
-            1) if all settings have been reverted to defaults
-            2) the current state of the setting (how many times this setting has been toggled)
-            3) changes to allheroes overriding of hero-overrides (when the value of the toggles match)
-        Again, fixing this requires a two-way dependency between
-            a) knowing what the current setting value is, and b) knowing the decision to flip the toggle
-        Since the correct solution is to fix the input (control) end to know what the outcome of changing the setting will be,
-            the only case it makes sense to put in the effort to check for is when changing toggles without having reset to defaults,
-            especially when considering that the two major use cases for the program are full settings and overriding keybindings.
-        - Warnings are issued when toggles are being used without having reset all settings to defaults
-    */
-
-    // (consts)
-    string[] noCrosshairLengthReticles = ["Circle", "Dot"];
-    
-    
-    // Update what options are grey
-    
-    void setGreyState(string name, ref OptionAvailable[string] opt, lazy bool cond){
-        if(settingName == name){
-            auto avail = cond ? OptionAvailable.no : OptionAvailable.yes;
-            if(os.currHero == "all heroes"){
-                // changes to "all heroes" changes all non-overridden heroes too
-                foreach(k, ref v; opt){
-                    if(k != "all heroes" && opt["all heroes"] == v){
-                        v = avail;
-                    }
-                }            
-            }
-            opt[os.currHero] = avail;
-        }
-    }
-    
-    setGreyState("Reticle type",  os.crosshairLengthAvailable, noCrosshairLengthReticles.canFind(settingValue.str));
-    setGreyState("Show Accuracy", os.centerGapAvailable,       settingValue.boolean);
-    
-
-    
-    // Check if setting tries to modify grey option (or occluded-by-brey option)
-
-    string greyOption = "Crosshair length";
-    if(greyOption in options  &&  options[settingName].idx >= options[greyOption].idx){
-        final switch(os.crosshairLengthAvailable[os.currHero]) with(OptionAvailable){
-        case no:
-            writefln(
-                "ERROR:\n" ~ 
-                "  Hero \"%s\":\n" ~ 
-                "    Option \"%s\" is unavailable since the option \"%s\" is greyed out.\n" ~ 
-                "    Reason: Option \"Reticle type\" was set to one of %s.\n" ~ 
-                "    Solution: \n" ~ 
-                "      Set the reticle type only after changing this setting.\n" ~ 
-                "      If you want to set the reticle type to one of %s, set it \n" ~ 
-                "      to \"Default\" before changing this setting, then to the desired type after.\n",
-                os.currHero, settingName, greyOption, noCrosshairLengthReticles, noCrosshairLengthReticles);
-            break;
-        case unknown:
-            writefln(
-                "WARNING:\n" ~ 
-                "  Hero \"%s\":\n" ~ 
-                "    Option \"%s\" might be unavailable since the option \"%s\" might be greyed out.\n" ~ 
-                "    Reason:\n" ~ 
-                "      This hero might have hero-specific overrides.\n" ~ 
-                "    Solution:\n" ~ 
-                "      Assign a value to the option \"Reticle type\" to this hero before changing this setting.\n", 
-                os.currHero, settingName, greyOption);
-            break;
-        case yes:
-            // (setting is available => no warnings)
-            break;
-        }
-    }
-    
-    greyOption = "Center gap";
-    if(greyOption in options  &&  options[settingName].idx >= options[greyOption].idx){
-        final switch(os.centerGapAvailable[os.currHero]) with(OptionAvailable){
-        case no:
-            writefln(
-                "ERROR:\n" ~ 
-                "  Hero \"%s\":\n" ~ 
-                "    Option \"%s\" is unavailable since the option \"%s\" is greyed out.\n" ~ 
-                "    Reason: Option \"Show accuracy\" was enabled.\n" ~ 
-                "    Solution: \n" ~ 
-                "      Disable \"Show accuracy\" before changing this setting, then re-enable it after, if desired.\n" ~ 
-                "      Note: Resetting to default settings enables \"Show accuracy\" for all heroes\n",
-                os.currHero, settingName, greyOption);
-            break;
-        case unknown:
-            writefln(
-                "WARNING:\n" ~ 
-                "  Hero \"%s\":\n" ~ 
-                "    Option \"%s\" might be unavailable since the option \"%s\" might be greyed out.\n" ~ 
-                "    Reason:\n" ~                 
-                "      This hero might have a hero-specific override for \"Show accuracy\".\n" ~ 
-                "    Solution: \n" ~ 
-                "      ???.\n",
-                os.currHero, settingName, greyOption);
-            break;
-        case yes:
-            // (setting is available => no warnings)
-            break;
-        }
-    }
-    
-    if(options[settingName].type == OptionType.Toggle){
-        if(!os.restoredDefaults){
-            writefln(
-                "WARNING:\n"~
-                "  Hero \"%s\":\n" ~
-                "    Toggle option \"%s\" used without resetting to defaults\n",
-                os.currHero, settingName
-            );
-        }
-    }
-}
-
-
 
 
 int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[string] options, ref OptionState optionState){
@@ -744,6 +550,12 @@ int settingsToActions(ref INPUT[] inputs, JSONValue heroSettings, OptionInfo[str
     }
     return currentOptionIdx;
 }
+
+
+//--------------------------------------
+// INPUT[] HELPERS
+//--------------------------------------
+
 
 void inputBinding(ref INPUT[] inputs, string settingName, JSONValue settingValue, OptionInfo optionInfo){
     // convert all to same format (2-long array of [string | array-of-string])
@@ -900,6 +712,210 @@ INPUT INPUTk(KEYBDINPUT ki){
 
 
 
+//--------------------------------------
+// BAD SETTING DETECTION
+//--------------------------------------
+
+
+enum OptionAvailable {
+    no,
+    yes,
+    unknown,
+}
+
+struct OptionState {
+    
+    string                      currHero;
+    OptionAvailable[string]     crosshairLengthAvailable;
+    OptionAvailable[string]     centerGapAvailable;
+    bool                        restoredDefaults;
+    
+    this(string[] heroList){
+        currHero = heroList[0];
+        foreach(hero; heroList){
+            crosshairLengthAvailable[hero]  = OptionAvailable.unknown;
+            centerGapAvailable[hero]        = OptionAvailable.unknown;
+        }
+    }
+}
+
+void restoreDefaults(ref OptionState os){
+    os.currHero = "all heroes";
+    os.restoredDefaults = true;
+    foreach(ref v; os.crosshairLengthAvailable){
+        v = OptionAvailable.yes;
+    }
+    foreach(ref v; os.centerGapAvailable){
+        v = OptionAvailable.no;
+    }
+}
+
+void badSettingCheck(ref OptionState os, string settingName, JSONValue settingValue, OptionInfo[string] options){
+    /*
+    Settings changes can be made in the allheroes or the hero-specific override menu
+    Changes can make the hero override the same as - or different from - the allheroes setting
+    Changes in the allheroes menu change settings in hero overrides when the values were the same
+        (changes are only registered when the menu is closed (another menu opened))
+    In other words: changes in the allheroes menu can "override hero overrides" if they started with the same value
+    
+    Greyed-out settings:
+        Some settings can grey-out options, and we want to disallow attempts to change these        
+        - Errors are issued if the values of these settings are known to be bad
+        - Warnings are issued if the values of these settings are unknown
+        Greyed-out options will change the amount of scrolling needed to reach the options below them
+            The easiest way to deal with this is to issue the same errors/warnings
+            (Easier, because otherwise it requires a two-way dependence between 
+                a) knowing the where the options are, and b) knowing what settings have been changed)
+            
+    Toggle-type settings:
+        Changing toggle settings can have unknown effects, since 
+            a) there is no way to control the difference between enabling and disabling a setting
+            b) there is no way to know what the existing value is, unless all settings are reset to defaults
+        The only changes that have known effects are when 
+            1) settings have been reset to defaults, and
+            2) the toggle is flipped only when it is something other than the default, and
+            3) the toggle has been flipped only once
+        To guarantee the desired effect of a toggle change, the decision must be based on
+            1) if all settings have been reverted to defaults
+            2) the current state of the setting (how many times this setting has been toggled)
+            3) changes to allheroes overriding of hero-overrides (when the value of the toggles match)
+        Again, fixing this requires a two-way dependency between
+            a) knowing what the current setting value is, and b) knowing the decision to flip the toggle
+        Since the correct solution is to fix the input (control) end to know what the outcome of changing the setting will be,
+            the only case it makes sense to put in the effort to check for is when changing toggles without having reset to defaults,
+            especially when considering that the two major use cases for the program are full settings and overriding keybindings.
+        - Warnings are issued when toggles are being used without having reset all settings to defaults
+    */
+
+    // (consts)
+    string[] noCrosshairLengthReticles = ["Circle", "Dot"];
+    
+    
+    // Update what options are grey
+    
+    void setGreyState(string name, ref OptionAvailable[string] opt, lazy bool cond){
+        if(settingName == name){
+            auto avail = cond ? OptionAvailable.no : OptionAvailable.yes;
+            if(os.currHero == "all heroes"){
+                // changes to "all heroes" changes all non-overridden heroes too
+                foreach(k, ref v; opt){
+                    if(k != "all heroes" && opt["all heroes"] == v){
+                        v = avail;
+                    }
+                }            
+            }
+            opt[os.currHero] = avail;
+        }
+    }
+    
+    setGreyState("Reticle type",  os.crosshairLengthAvailable, noCrosshairLengthReticles.canFind(settingValue.str));
+    setGreyState("Show Accuracy", os.centerGapAvailable,       settingValue.boolean);
+    
+
+    
+    // Check if setting tries to modify grey option (or occluded-by-brey option)
+
+    string greyOption = "Crosshair length";
+    if(greyOption in options  &&  options[settingName].idx >= options[greyOption].idx){
+        final switch(os.crosshairLengthAvailable[os.currHero]) with(OptionAvailable){
+        case no:
+            writefln(
+                "ERROR:\n" ~ 
+                "  Hero \"%s\":\n" ~ 
+                "    Option \"%s\" is unavailable since the option \"%s\" is greyed out.\n" ~ 
+                "    Reason: Option \"Reticle type\" was set to one of %s.\n" ~ 
+                "    Solution: \n" ~ 
+                "      Set the reticle type only after changing this setting.\n" ~ 
+                "      If you want to set the reticle type to one of %s, set it \n" ~ 
+                "      to \"Default\" before changing this setting, then to the desired type after.\n",
+                os.currHero, settingName, greyOption, noCrosshairLengthReticles, noCrosshairLengthReticles);
+            break;
+        case unknown:
+            writefln(
+                "WARNING:\n" ~ 
+                "  Hero \"%s\":\n" ~ 
+                "    Option \"%s\" might be unavailable since the option \"%s\" might be greyed out.\n" ~ 
+                "    Reason:\n" ~ 
+                "      This hero might have hero-specific overrides.\n" ~ 
+                "    Solution:\n" ~ 
+                "      Assign a value to the option \"Reticle type\" to this hero before changing this setting.\n", 
+                os.currHero, settingName, greyOption);
+            break;
+        case yes:
+            // (setting is available => no warnings)
+            break;
+        }
+    }
+    
+    greyOption = "Center gap";
+    if(greyOption in options  &&  options[settingName].idx >= options[greyOption].idx){
+        final switch(os.centerGapAvailable[os.currHero]) with(OptionAvailable){
+        case no:
+            writefln(
+                "ERROR:\n" ~ 
+                "  Hero \"%s\":\n" ~ 
+                "    Option \"%s\" is unavailable since the option \"%s\" is greyed out.\n" ~ 
+                "    Reason: Option \"Show accuracy\" was enabled.\n" ~ 
+                "    Solution: \n" ~ 
+                "      Disable \"Show accuracy\" before changing this setting, then re-enable it after, if desired.\n" ~ 
+                "      Note: Resetting to default settings enables \"Show accuracy\" for all heroes\n",
+                os.currHero, settingName, greyOption);
+            break;
+        case unknown:
+            writefln(
+                "WARNING:\n" ~ 
+                "  Hero \"%s\":\n" ~ 
+                "    Option \"%s\" might be unavailable since the option \"%s\" might be greyed out.\n" ~ 
+                "    Reason:\n" ~                 
+                "      This hero might have a hero-specific override for \"Show accuracy\".\n" ~ 
+                "    Solution: \n" ~ 
+                "      ???.\n",
+                os.currHero, settingName, greyOption);
+            break;
+        case yes:
+            // (setting is available => no warnings)
+            break;
+        }
+    }
+    
+    if(options[settingName].type == OptionType.Toggle){
+        if(!os.restoredDefaults){
+            writefln(
+                "WARNING:\n"~
+                "  Hero \"%s\":\n" ~
+                "    Toggle option \"%s\" used without resetting to defaults\n",
+                os.currHero, settingName
+            );
+        }
+    }
+}
+
+
+//--------------------------------------
+// UTILS
+//--------------------------------------
+
+JSONValue parseJSON(string s){
+    JSONValue v;
+    try {
+        v = std.json.parseJSON(s);
+    } catch(Exception e){
+        string msg;
+        auto matches = e.msg.matchFirst(r"^.+?Line (\d+?):(\d+?)\)");
+        if(matches.length == 3){
+            auto line = matches[1].to!int;
+            auto col  = matches[2].to!int;
+            msg = format("%s\n%s\n%s%s\n", 
+                e.msg,
+                s.splitLines[line-1],
+                " ".repeat(col-1).reduce!"a~b", "^");
+        } else {
+            msg = e.msg;
+        }
+        throw new Exception(msg);
+    }
+    return v;
+}
 
 void printInputs(INPUT[] inputs){
     foreach(idx, input; inputs){
@@ -922,16 +938,6 @@ void printInputs(INPUT[] inputs){
         }
     }
 }
-
-void performInputs(INPUT[] inputs){
-    foreach(idx, input; inputs){
-        SendInput(1, &input, input.sizeof);
-        Thread.sleep(tick);
-    }
-}
-
-
-
 
 POINT cursorPos(){
     POINT p;
