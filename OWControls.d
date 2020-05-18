@@ -871,7 +871,7 @@ void badSettingCheck(ref OptionState os, string settingName, JSONValue settingVa
                 "    Reason:\n" ~                 
                 "      This hero might have a hero-specific override for \"Show accuracy\".\n" ~ 
                 "    Solution: \n" ~ 
-                "      ???.\n",
+                "      Only use this setting after having reset to default settings.\n",
                 os.currHero, settingName, greyOption);
             break;
         case yes:
