@@ -15,8 +15,8 @@ Getting started
 Downloading and running the program
 -----------------------------------
 
- - [Download from the releases tab](https://github.com/klasbo/OWControls/releases).  
- - Run the program from the command line (`Shift + Right Click` in the folder -> "Open command window here")  
+ - [Download `OWControls.zip` from the releases tab](https://github.com/klasbo/OWControls/releases).  
+ - Unzip, and run the program from the command line (`Shift + Right Click` in the folder -> "Open command window here")  
    Example: `.\OWControls.exe -i settings.json`
  - Once loaded, go to Overwatch and open up the Controls tab in the Options menu. Press `F7` to start inputting commands.
  - If something goes wrong, press `BREAK` (the key to the right of Scroll Lock) to abort the input.
@@ -55,7 +55,7 @@ The only option you should need is the first one (`-i`), used to select the conf
 Creating your own config file
 -----------------------------
 
-It is *highly* recommended that you [look at the examples](/examples) and copy-paste. I would suggest starting with the [all settings example](/examples/all_settings.json) if you want to create a full config file, or the [commo rose example](/examples/battlefield_commorose.1.48.json) if you just want to set the patch 1.48 communication menu.
+It is *highly* recommended that you [look at the examples](/examples) and copy-paste. I would suggest starting with the [all settings example](/examples/all_settings.json) if you want to create a full config file, or the [commo rose example](/examples/battlefield_commorose.1.48.json) if you just want to customize the patch 1.48 communication menu.
 
 You can skip this section if you look at the examples.
 
