@@ -9,6 +9,9 @@ Use cases:
  - You want to change a single keybind but have hero-specific overrides that you have to over-override
  - You prefer editing configs in a text editor instead of a gui
  
+### [Watch a demo on youtube here](https://www.youtube.com/watch?v=RsJooMJFu4I)
+
+ 
 Getting started
 ===============
 
