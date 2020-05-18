@@ -413,7 +413,6 @@ INPUT[] heroSettingsToActions(JSONValue heroSettings, Options options){
                 
             optionState.currHero = heroName;
             optionExitDepth = inputs.settingsToActions(settings, optionInfos, optionState);
-            writeln(optionExitDepth);
         }
     }
 
