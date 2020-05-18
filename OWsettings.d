@@ -51,7 +51,7 @@ __gshared Duration  scrollLoadTime;
 
 __gshared string    performInputHotkey_str  = "F7";
 __gshared ushort    performInputHotkey_vkey;
-__gshared string    abortInputHotkey_str    = "ESC";
+__gshared string    abortInputHotkey_str    = "BREAK";
 __gshared ushort    abortInputHotkey_vkey;
 
 auto coords         = Coordinates();
@@ -170,9 +170,9 @@ void main(string[] args){
             (Action a){
                 final switch(a) with(Action){
                 case PerformInput:
-                    writeln("Running input sequence");
                     final switch(state.behavior) with(Behavior){
                     case idle:
+                        writeln("Running input sequence");
                         state.behavior = running;
                         ticker.send(tick);
                         break;
@@ -182,11 +182,11 @@ void main(string[] args){
                     break;
                     
                 case AbortInput:
-                    writefln("Aborting input sequence (%d of %d inputs performed)", state.index, inputs.length);
                     final switch(state.behavior) with(Behavior){
                     case idle:
                         break;
                     case running:
+                        writefln("Aborting input sequence (%d of %d inputs performed)", state.index, inputs.length);
                         ticker.send(0.msecs);
                         state.behavior = idle;
                         state.index = 0;
@@ -987,6 +987,7 @@ static this(){
         "ALT"                   : VK_MENU,
         "MENU"                  : VK_MENU,
         "PAUSE"                 : VK_PAUSE,
+        "BREAK"                 : VK_PAUSE,
         "CAPITAL"               : VK_CAPITAL,
         "KANA"                  : VK_KANA,
         "HANGEUL"               : VK_HANGEUL,
