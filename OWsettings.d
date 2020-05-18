@@ -26,6 +26,7 @@ import std.array;
 import std.concurrency;
 import std.conv;
 import std.datetime.stopwatch;
+import std.datetime;
 import std.file;
 import std.format;
 import std.functional;
@@ -41,15 +42,23 @@ import std.string;
 
 
 
-auto tick           = 17.msecs;
-auto menuLoadTime   = 800.msecs;
-auto scrollLoadTime = 100.msecs;
+__gshared uint      tick_ms                 = 17;
+__gshared Duration  tick;
+__gshared uint      menuLoadTime_ms         = 800;
+__gshared Duration  menuLoadTime;
+__gshared uint      scrollLoadTime_ms       = 100;
+__gshared Duration  scrollLoadTime;
+
+__gshared string    performInputHotkey_str  = "F7";
+__gshared ushort    performInputHotkey_vkey;
+__gshared string    abortInputHotkey_str    = "ESC";
+__gshared ushort    abortInputHotkey_vkey;
+
 auto coords         = Coordinates();
 
-enum Hotkey {
-    HK1,
-    HK2,
-    HK3,
+enum Action {
+    PerformInput,
+    AbortInput,
 }
 
 struct Coordinates {
@@ -70,28 +79,51 @@ struct Options {
     JSONValue[string]   hero;
 }
 
+
+
 void main(string[] args){
 
-    string inputFile;
-    string optionsFile;
-    auto sw = StopWatch(AutoStart.no);
-
-    getopt(args,
-        std.getopt.config.required,
-        "i|input", &inputFile,
-        "o|options", &optionsFile,
-    );
+    string  inputFile;
+    string  optionsFile;
+    auto sw = std.datetime.stopwatch.StopWatch(AutoStart.no);
+    
+    // CONFIG
+    {
+        getopt(args,
+            std.getopt.config.required,
+            "i|input",          &inputFile,
+            "o|options",        &optionsFile,
+            "t|tick",           &tick_ms,
+            "m|t_m|t_menu",     &menuLoadTime_ms,
+            "s|t_s|t_scroll",   &scrollLoadTime_ms,
+            "r|run",            &performInputHotkey_str,
+            "a|abort",          &abortInputHotkey_str,
+        );
+        
+        tick            = tick_ms.msecs;
+        menuLoadTime    = menuLoadTime_ms.msecs;
+        scrollLoadTime  = scrollLoadTime_ms.msecs;
+        
+        void setHotkey(ref ushort keycode, ref string keyname){
+            keyname = keyname.toUpper;
+            if(keyname != ""){
+                assert(keyname in vkeyCodeOf, format("\"%s\" is not a valid key for hotkeys", keyname));
+            }
+            keycode = vkeyCodeOf[keyname];
+        }
+        setHotkey(performInputHotkey_vkey,  performInputHotkey_str);
+        setHotkey(abortInputHotkey_vkey,    abortInputHotkey_str);
+    }
+    
+    
+    // CREATING INPUT SEQUENCE
     
     if(optionsFile == ""){
         optionsFile = dirEntries("options", SpanMode.shallow).array[$-1];
     }
-
-    RegisterHotKey(null, Hotkey.HK1, 0x4000, VK_F6);
-    RegisterHotKey(null, Hotkey.HK2, 0x4000, VK_F7);
-    RegisterHotKey(null, Hotkey.HK3, 0x4000, VK_F8);
+    writefln("Options file: %s", optionsFile);
     
-    writeln("started");
-    
+    writeln("Loading...");    
     sw.start();
     
     auto j = optionsFile.readText.parseJSON;
@@ -112,20 +144,115 @@ void main(string[] args){
     auto inputTime = (inputs.length * tick).split!("seconds", "msecs");
     writefln("Inputting settings should take %d.%01d seconds", inputTime.seconds, inputTime.msecs/100);
 
+  
+    // RUNNING INPUT SEQUENCE
+    
+    enum Behavior {
+        idle,
+        running,
+    }
+    struct State {
+        Behavior    behavior;
+        size_t      index;
+    }
+    auto state = State(Behavior.idle, 0);
+    
+    auto ticker         = spawn(&ticker_thr);
+    auto hotkeyReader   = spawn(&hotkeyReader_thr);
+    
+    writefln("Press \"%s\" to start inputting commands (%s to abort)",
+        performInputHotkey_str == ""    ? "F7"  : performInputHotkey_str,
+        abortInputHotkey_str == ""      ? "ESC" : abortInputHotkey_str,
+    );
+    
+    while(true){
+        receive(
+            (Action a){
+                final switch(a) with(Action){
+                case PerformInput:
+                    writeln("Running input sequence");
+                    final switch(state.behavior) with(Behavior){
+                    case idle:
+                        state.behavior = running;
+                        ticker.send(tick);
+                        break;
+                    case running:
+                        break;
+                    }
+                    break;
+                    
+                case AbortInput:
+                    writefln("Aborting input sequence (%d of %d inputs performed)", state.index, inputs.length);
+                    final switch(state.behavior) with(Behavior){
+                    case idle:
+                        break;
+                    case running:
+                        ticker.send(0.msecs);
+                        state.behavior = idle;
+                        state.index = 0;
+                        break;
+                    }
+                    break;
+                }
+            },
+            (TimerTick t){
+                final switch(state.behavior) with(Behavior){
+                case idle:
+                    break;
+                case running:
+                    //SendInput(1, &inputs[state.index], INPUT.sizeof);
+                    state.index++;
+                    if(state.index >= inputs.length){
+                        writeln("\7Input sequence completed");
+                        ticker.send(0.msecs);
+                        state.behavior = idle;
+                        state.index = 0;
+                    }
+                    break;
+                }
+            }
+        );
+    }
+}
+
+void hotkeyReader_thr(){
+    RegisterHotKey(null, Action.PerformInput, 0x4000, performInputHotkey_vkey);
+    RegisterHotKey(null, Action.AbortInput,   0x4000, abortInputHotkey_vkey);
+
     auto msg = MSG();
     while(GetMessage(&msg, null, 0, 0) != 0){
         if(msg.message == WM_HOTKEY){
-            final switch(msg.wParam) with(Hotkey){
-            case HK1:
-                printInputs(inputs);
-                break;
-            case HK2:
-                performInputs(inputs);
-                writeln("\7");
-                break;
-            case HK3:
-                writeln(cursorPos);
-                break;
+            ownerTid.send(cast(Action)(msg.wParam));
+        }
+    }
+}
+
+struct TimerTick {}
+void ticker_thr(){
+    auto wakeTime = Clock.currTime + 1.hours;
+    Duration tick;
+    bool active;
+    
+    while(true){
+        auto timeout = wakeTime - Clock.currTime;
+        auto timedOut = !receiveTimeout(timeout,
+            (Duration d){
+                if(d == 0.msecs){
+                    wakeTime += 1.hours;
+                    active = false;
+                } else {
+                    tick = d;
+                    wakeTime = Clock.currTime + tick;
+                    active = true;
+                }
+            },
+        );
+        if(timedOut){
+            if(active){
+                ownerTid.send(TimerTick());
+                wakeTime += tick;
+            } else {
+                wakeTime += 1.hours;
             }
         }
     }
@@ -310,18 +437,29 @@ INPUT[] heroSettingsToActions(JSONValue heroSettings, Options options){
         format("Settings top-level container must be an array (to preserve ordering of inputs), got %s", heroSettings.type));
     assert(heroSettings.array.length > 0,
         format("Settings array is empty"));
-        
-    if(heroSettings.array[0].type == JSONType.string){
-        if(["RESET DEFAULTS", "RESET", "RESTORE DEFAULTS", "RESTORE", "DEFAULT", "UNBINDALL"].canFind(heroSettings.array[0].str.toUpper)){
-            inputs.inputVKey(VK_BACK);
-            inputs.inputVKey(VK_RETURN);
-            heroSettings.array = heroSettings.array[1..$];
-            optionState.restoreDefaults();
+     
+    // strings
+    foreach(v; heroSettings.array){
+        if(v.type == JSONType.string){
+            string str = v.str;
+            if(["RESET DEFAULTS", "RESET", "RESTORE DEFAULTS", "RESTORE", "DEFAULT", "UNBINDALL"].canFind(str.toUpper)){
+                inputs.inputVKey(VK_BACK);
+                inputs.inputVKey(VK_RETURN);
+                heroSettings.array = heroSettings.array[1..$];
+                optionState.restoreDefaults();
+            } else if(str.startsWith("//")){
+                writefln("Settings file comment: \n\t\"%s\"", str[2..$]);
+                heroSettings.array = heroSettings.array[1..$];
+            } else {
+                assert(0, format("Unrecognized string \"%s\", did you mean \"Restore defaults\"?", heroSettings.array[0].str));
+            }
         } else {
-            assert(0, format("Unrecognized string \"%s\", did you mean \"Restore defaults\"?", heroSettings.array[0].str));
+            break;
         }
     }
+
         
+    // objects
     foreach(heroSettingIdx, heroSetting; heroSettings.array){
     
         assert(heroSetting.type == JSONType.object  &&  heroSetting.object.length == 1,
@@ -857,6 +995,7 @@ static this(){
         "HANJA"                 : VK_HANJA,
         "KANJI"                 : VK_KANJI,
         "ESCAPE"                : VK_ESCAPE,
+        "ESC"                   : VK_ESCAPE,
         "CONVERT"               : VK_CONVERT,
         "NONCONVERT"            : VK_NONCONVERT,
         "ACCEPT"                : VK_ACCEPT,
@@ -882,7 +1021,7 @@ static this(){
         "HELP"                  : VK_HELP,
         //"LWIN"                  : VK_LWIN,
         //"RWIN"                  : VK_RWIN,
-        "APPS"                  : VK_APPS,
+        //"APPS"                  : VK_APPS,
         "NUMPAD0"               : VK_NUMPAD0,
         "NUMPAD1"               : VK_NUMPAD1,
         "NUMPAD2"               : VK_NUMPAD2,
