@@ -158,7 +158,7 @@ void main(string[] args){
                     case idle:
                         break;
                     case running:
-                        writefln("Aborting input sequence (%d of %d inputs performed)", state.index, inputs.length);
+                        writefln("\7Aborting input sequence (%d of %d inputs performed)", state.index, inputs.length);
                         ticker.send(0.msecs);
                         state.behavior = idle;
                         state.index = 0;
