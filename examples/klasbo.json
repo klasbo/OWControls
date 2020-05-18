@@ -1,4 +1,6 @@
 [
+    "//klasbo's personal settings",
+    "Restore Defaults",
     {"all heroes" : [
         {"Sensitivity":                     3},
         {"Reticle type":                    "Crosshairs"},
@@ -173,13 +175,13 @@
         {"Primary fire":                            "mouse right click"},
         {"Secondary fire":                          "mouse left click"},
     ]},
-    {"orisa": [
-        {"Reticle type":                            "Circle"},
-        {"Reticle Advanced": [
+    {"orisa": [ 
+        {"Reticle Advanced": [           
             {"Crosshair length":                    2},
             {"Center gap":                          100},
             {"Opacity":                             20},
         ]},
+        {"Reticle type":                            "Circle"},
     ]},
     {"pharah": [
         {"Ability 2":                               ["", "mouse right click"]},
