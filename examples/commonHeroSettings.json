@@ -1,5 +1,7 @@
 [
-    "//These are some of the commonly made changes to hero-specific changes. Note that the toggle settings will trigger warnings if you don't reset to default settings first.",
+    "// These are some of the commonly made changes to hero-specific changes.", 
+    "// Note that the toggle settings will trigger warnings if you don't reset to default settings first.",
+    
     {"all heroes" : [    
         {"Allied health bars":                      "Always"},
         {"Show friendly outlines":                  "Occluded"},
