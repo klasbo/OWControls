@@ -448,7 +448,7 @@ INPUT[] heroSettingsToActions(JSONValue heroSettings, Options options){
                 heroSettings.array = heroSettings.array[1..$];
                 optionState.restoreDefaults();
             } else if(str.startsWith("//")){
-                writefln("Settings file comment: \n\t\"%s\"", str[2..$]);
+                writefln("\t\"%s\"", str);
                 heroSettings.array = heroSettings.array[1..$];
             } else {
                 assert(0, format("Unrecognized string \"%s\", did you mean \"Restore defaults\"?", heroSettings.array[0].str));
@@ -977,6 +977,7 @@ static this(){
         "XBUTTON1"              : VK_XBUTTON1,
         "XBUTTON2"              : VK_XBUTTON2,
         "BACK"                  : VK_BACK,
+        "BACKSPACE"             : VK_BACK,
         "TAB"                   : VK_TAB,
         "CLEAR"                 : VK_CLEAR,
         "RETURN"                : VK_RETURN,
@@ -1065,9 +1066,9 @@ static this(){
         "NUMLOCK"               : VK_NUMLOCK,
         "SCROLL"                : VK_SCROLL,
         "LSHIFT"                : VK_LSHIFT,
-        //"RSHIFT"                : VK_RSHIFT, // requires scancode to work properly, see inputOf map below
+        //"RSHIFT"                : VK_RSHIFT,      // requires scancode to work properly, see inputOf map below
         "LCONTROL"              : VK_LCONTROL,
-        "RCONTROL"              : VK_RCONTROL,
+        //"RCONTROL"              : VK_RCONTROL,    // requires extendedkey
         "LALT"                  : VK_LMENU,
         "RALT"                  : VK_RMENU,
         "LMENU"                 : VK_LMENU,
@@ -1187,7 +1188,15 @@ static this(){
         "RSHIFT": [
             INPUTk(KEYBDINPUT(VK_RSHIFT, 0x36, KEYEVENTF_EXTENDEDKEY, 0, 0)),
             INPUTk(KEYBDINPUT(VK_RSHIFT, 0x36, KEYEVENTF_KEYUP | KEYEVENTF_EXTENDEDKEY, 0, 0)),
-        ]
+        ],
+        "RCONTROL": [
+            INPUTk(KEYBDINPUT(VK_RCONTROL, 0, KEYEVENTF_EXTENDEDKEY, 0, 0)),
+            INPUTk(KEYBDINPUT(VK_RCONTROL, 0, KEYEVENTF_KEYUP | KEYEVENTF_EXTENDEDKEY, 0, 0)),
+        ],
+        "NUMENTER": [
+            INPUTk(KEYBDINPUT(VK_RETURN, 0, KEYEVENTF_EXTENDEDKEY, 0, 0)),
+            INPUTk(KEYBDINPUT(VK_RETURN, 0, KEYEVENTF_KEYUP | KEYEVENTF_EXTENDEDKEY, 0, 0)),
+        ],
 
 
     ];
