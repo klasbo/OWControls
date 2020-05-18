@@ -200,7 +200,7 @@ void main(string[] args){
                 case idle:
                     break;
                 case running:
-                    //SendInput(1, &inputs[state.index], INPUT.sizeof);
+                    SendInput(1, &inputs[state.index], INPUT.sizeof);
                     state.index++;
                     if(state.index >= inputs.length){
                         writeln("\7Input sequence completed");
