@@ -1,0 +1,14 @@
+[
+    "//This is the closest we can get to the commo rose as found in the Battlefield series.",
+    {"all heroes" : [
+        {"Communication menu":              ""},
+        {"Commo rose N":                    "Go"},
+        {"Commo rose NW":                   "Yes"},
+        {"Commo rose NE":                   "No"},
+        {"Commo rose W":                    "Thanks"},
+        {"Commo rose E":                    "Sorry"},
+        {"Commo rose SW":                   "Need healing/buffs"},
+        {"Commo rose SE":                   "Group up"},
+        {"Commo rose S":                    "Countdown"},
+    ]}
+]

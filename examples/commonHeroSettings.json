@@ -1,0 +1,45 @@
+[
+    "//These are some of the commonly made changes to hero-specific changes. Note that the toggle settings will trigger warnings if you don't reset to default settings first.",
+    {"all heroes" : [    
+        {"Allied health bars":                      "Always"},
+        {"Show friendly outlines":                  "Occluded"},
+    ]},
+    {"ana": [
+        {"Toggle zoom":                             true},
+        {"Relative aim sensitivity while zoomed":   37.94},
+    ]},
+    {"ashe": [
+        {"Toggle zoom":                             true},
+        {"Relative aim sensitivity while zoomed":   51.44},
+    ]},
+    {"baptiste": [
+        {"Automatic reload":                        false},
+    ]},
+    {"dva": [
+        {"Hold boosters":                           true},
+    ]},
+    {"lucio": [
+        {"Allow backwards wallride":                true},
+    ]},
+    {"mercy": [
+        {"Toggle beam connection":                  true},
+        {"Guardian angel prefers beam target":      false},
+        {"Toggle guardian angel":                   true},
+    ]},
+    {"pharah": [
+        {"Ability 2":                               ["", "mouse right click"]},
+    ]},
+    {"reinhardt": [
+        {"Toggle barrier":                          true},
+    ]},
+    {"soldier": [
+        {"Hold to sprint":                          true},
+    ]},
+    {"widowmaker": [
+        {"Toggle zoom":                             true},
+        {"Relative aim sensitivity while zoomed":   37.94},
+    ]},
+    {"winston": [
+        {"Quick melee":                             ["", "mouse right click"]},
+    ]},
+]
