@@ -361,6 +361,7 @@ INPUT[] heroSettingsToActions(JSONValue heroSettings, Options options){
     INPUT[] inputs;
     inputs.reserve(1000);
     int currHeroIdx = -1;
+    int optionExitDepth = 150;
     auto optionState = OptionState(options.heroList);
 
     assert(heroSettings.type == JSONType.array,
@@ -404,14 +405,15 @@ INPUT[] heroSettingsToActions(JSONValue heroSettings, Options options){
                 format("Hero settings items must be objects of the form '{\"settingName\" : settingValue}' (item %d: hero name \"%s\")", heroSettingIdx, heroName));
 
 
-            currHeroIdx = inputs.inputHeroSelect(heroName, options.heroList, currHeroIdx);
+            currHeroIdx = inputs.inputHeroSelect(heroName, options.heroList, currHeroIdx, optionExitDepth);
 
             OptionInfo[string] optionInfos = (heroName == options.heroList[0]) ?
                 (options.top ~ options.middle ~ options.hero[heroName] ~ options.bottom).genOptions :
                 (options.top ~ options.hero[heroName] ~ options.middle ~ options.bottom).genOptions;
                 
             optionState.currHero = heroName;
-            inputs.settingsToActions(settings, optionInfos, optionState);
+            optionExitDepth = inputs.settingsToActions(settings, optionInfos, optionState);
+            writeln(optionExitDepth);
         }
     }
 
@@ -602,12 +604,12 @@ void inputDropdown(ref INPUT[] inputs, string settingName, JSONValue settingValu
 
 
 
-int inputHeroSelect(ref INPUT[] inputs, string hero, string[] heroList, int fromHeroIdx = -1){
+int inputHeroSelect(ref INPUT[] inputs, string hero, string[] heroList, int fromHeroIdx = -1, int fromOptionDepth = 150){
 
     int heroIdx = heroList.countUntil(hero);
 
     // Scroll to top of options screen
-    for(int i = 0; i < 12; i++){
+    for(int i = 0; i < fromOptionDepth/14 + 1; i++){
         inputs.inputClickOn(coords.optionsScrollBarTop);
         inputs.inputNop((scrollLoadTime/tick + 1).to!uint);
     }
