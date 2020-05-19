@@ -24,8 +24,9 @@ Downloading and running the program
  - Once loaded, go to Overwatch and open up the Controls tab in the Options menu. Press `F7` to start inputting commands.
  - If something goes wrong, press `BREAK` (the key to the right of Scroll Lock) to abort the input.
  - A beep will sound when all the program is done inputting settings.
+ - Press `Ctrl+C` in the command line window to close the program.
  
-This program only works in 16:9 aspect ratio, with a 16:9 resolution.
+This program only works in fullscreen (both borderless or exclusive), with a 16:9 aspect ratio and a 16:9 resolution, and on the primary monitor (the one with the windows task bar on it).
 
 
 ### Options:
