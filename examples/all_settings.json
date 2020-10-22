@@ -228,6 +228,7 @@
     {"lucio": [
         {"Hold to crossfade":                       true},
         {"Allow backwards wallride":                true},
+        {"Wall jump on release":                    true},
     ]},
     {"mccree": [
         {"Recoil recovery aim compensation":        false},
