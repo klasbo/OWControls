@@ -1,7 +1,7 @@
 What is this?
 =============
 
-This is command-line program that takes a config file of your in-game controls settings, and generates a sequence of mouse and keyboard commands to input them into the game... much faster than you can.
+This is a command-line program that takes a config file of your in-game controls settings, and generates a sequence of mouse and keyboard commands to input them into the game... much faster than you can.
 
 Use cases:
 
