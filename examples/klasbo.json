@@ -12,7 +12,7 @@
             {"Center gap":                  45},
             {"Opacity":                     0},
             {"Outline opacity":             100},
-            {"Dot size":                    2},
+            {"Dot size":                    4},
             {"Dot opacity":                 100},
             {"Scale with resolution":       false},
         ]},
@@ -23,7 +23,7 @@
         {"Back":                            "l"},
         {"Left":                            "k"},
         {"Right":                           "oem_3"},
-        {"Crouch":                          "space"},
+        {"Crouch":                          ["space", "rcontrol"]},
         {"Toggle crouch":                   ""},
         {"Jump":                            "rshift"},
         
@@ -76,7 +76,7 @@
         {"Emote (left)":                    ""},
         
         {"Voice line menu":                 "right"},
-        {"Voice line (up)":                 ""},
+        {"Voice line (up) (menu)":          ""},
         {"Voice line (right)":              ""},
         {"Voice line (down)":               ""},
         {"Voice line (left)":               ""},
@@ -101,12 +101,12 @@
         {"Spectate player 4":                       "f4"},
         {"Spectate player 5":                       "f5"},
         {"Spectate player 6":                       "f6"},
-        {"Spectate player 7":                       "f7"},
-        {"Spectate player 8":                       "f8"},
-        {"Spectate player 9":                       "f9"},
-        {"Spectate player 10":                      "f10"},
-        {"Spectate player 11":                      "f11"},
-        {"Spectate player 12":                      "f12"},
+        {"Spectate player 7":                       "1"},
+        {"Spectate player 8":                       "2"},
+        {"Spectate player 9":                       "3"},
+        {"Spectate player 10":                      "4"},
+        {"Spectate player 11":                      "5"},
+        {"Spectate player 12":                      "6"},
         {"Spectate toggle overlay":                 "oem_2"},
         {"Spectate toggle pause":                   "9"},
         {"Objective camera":                        ""},
@@ -116,10 +116,10 @@
         {"Toggle normal/simple 3p spectator camera":""},
         {"Spectate toggle 3p":                      ""},
         {"Spectate toggle simple 3p camera side":   ""},
-        {"Static camera 1":                         ""},
-        {"Static camera 2":                         ""},
-        {"Static camera 3":                         ""},
-        {"Static camera 4":                         ""},
+        {"Static camera 1":                         "z"},
+        {"Static camera 2":                         "x"},
+        {"Static camera 3":                         "c"},
+        {"Static camera 4":                         "v"},
         {"Static camera 5":                         ""},
         {"Static camera 6":                         ""},
         {"Static camera 7":                         ""},
@@ -128,7 +128,7 @@
         {"Show health bars":                        ""},
         {"Spectate lock on":                        "mouse left click"},
         {"Spectate target under reticle":           "mouse right click"},
-        {"Disable camera blending":                 "z"},
+        {"Disable camera blending":                 "g"},
         {"Modify fov":                              "h"},
         {"Move fast":                               "n"},
         {"Move slow":                               "b"},
@@ -143,6 +143,7 @@
         {"Media controls":                  "oem_6"},
         {"Replay back":                     "i"},
         {"Replay forward":                  "p"},
+        {"View spectator options menu":     "f11"},
 
         {"Capture highlight":               "f9"},
         {"Capture highlight - Slot 1":      ""},
@@ -166,31 +167,29 @@
     ]},
     {"ana": [
         {"Toggle zoom":                             true},
-        {"Relative aim sensitivity while zoomed":   40},
+        {"Relative aim sensitivity while zoomed":   45},
         {"Recoil recovery aim compensation":        false},
-        {"Reticle Advanced": [
-            {"Dot size":                            3},
-        ]},
     ]},
     {"ashe": [
-        {"Toggle zoom":                             true},
-        {"Relative aim sensitivity while zoomed":   55},
-        {"Recoil recovery aim compensation":        false},
         {"Reticle Advanced": [
             {"Dot size":                            4},
         ]},
+        {"Toggle zoom":                             true},
+        {"Relative aim sensitivity while zoomed":   60},
+        {"Recoil recovery aim compensation":        false},
     ]},
     {"baptiste": [
         {"Automatic reload":                        false},
     ]},
     {"dva": [
-        {"Hold boosters":                           true},
-        {"Ability 2":                               ["oem_7", "r"]},
         {"Reticle Advanced": [
             {"Crosshair length":                    20},
             {"Center gap":                          100},
             {"Opacity":                             40},
+            {"Dot size":                            2},
         ]},
+        {"Hold boosters":                           true},
+        {"Ability 2":                               ["oem_7", "r"]},
     ]},
     {"doomfist": [
         {"Ability 1":                               "mouse right click"},
@@ -201,22 +200,38 @@
             {"Crosshair length":                    35},
             {"Center gap":                          100},
             {"Opacity":                             30},
+            {"Dot size":                            2},
         ]},
         {"Reticle type":                            "Circle and crosshairs"},
     ]},
-    {"lucio": [
-        {"Allow backwards wallride":                true},
+    {"genji": [
         {"Reticle Advanced": [
-            {"Crosshair length":                    14},
+            {"Crosshair length":                    35},
             {"Center gap":                          100},
-            {"Opacity":                             60},
+            {"Opacity":                             30},
+            {"Dot size":                            2},
         ]},
+        {"Reticle type":                            "Circle and crosshairs"},
+    ]},
+    {"hanzo": [
+        {"Reticle Advanced": [
+            {"Thickness":                           9},
+            {"Crosshair length":                    2},
+            {"Center gap":                          100},
+            {"Opacity":                             70},
+        ]},
+        {"Reticle type":                            "Crosshairs"},
+    ]},
+    {"lucio": [
+        {"Reticle Advanced": [
+            {"Crosshair length":                    35},
+            {"Center gap":                          100},
+            {"Opacity":                             45},
+        ]},
+        {"Allow backwards wallride":                true},
     ]},
     {"mccree": [
         {"Recoil recovery aim compensation":        false},
-        {"Reticle Advanced": [
-            {"Dot size":                            3},
-        ]},
     ]},
     {"mei": [
         {"Reticle Advanced": [           
@@ -227,14 +242,17 @@
         {"Reticle type":                            "Circle and crosshairs"},
     ]},
     {"mercy": [
-        {"Toggle beam connection":                  true},
-        {"Guardian angel prefers beam target":      false},
-        {"Toggle guardian angel":                   true},
         {"Reticle Advanced": [
             {"Crosshair length":                    20},
             {"Center gap":                          100},
             {"Opacity":                             40},
+            {"Dot size":                            2},
         ]},
+        {"Toggle beam connection":                  true},
+        {"Guardian angel target priority":          "Prefer facing target"},
+        {"Guardian angel sensitivity":              100},
+        {"Toggle guardian angel":                   false},
+        {"Beam sensitivity":                        100},
     ]},
     {"moira": [
         {"Primary fire":                            "mouse right click"},
@@ -245,6 +263,7 @@
             {"Crosshair length":                    2},
             {"Center gap":                          100},
             {"Opacity":                             20},
+            {"Dot size":                            2},
         ]},
         {"Reticle type":                            "Circle"},
     ]},
@@ -261,34 +280,43 @@
     {"soldier": [
         {"Hold to sprint":                          true},
     ]},
+    {"torbjorn": [
+        {"Reticle Advanced": [
+            {"Thickness":                           11},
+            {"Crosshair length":                    2},
+            {"Center gap":                          100},
+            {"Opacity":                             60},
+        ]},
+        {"Reticle type":                            "Crosshairs"},
+    ]},
     {"tracer": [
-        {"Ability 3":                               "n"},
         {"Reticle Advanced": [
             {"Center gap":                          100},
             {"Opacity":                             20},
         ]},
         {"Reticle type":                            "Circle"},
+        {"Ability 3":                               "n"},
     ]},
     {"widowmaker": [
+        {"Reticle Advanced": [
+            {"Dot size":                            4},
+        ]},
         {"Toggle zoom":                             true},
-        {"Relative aim sensitivity while zoomed":   40},
+        {"Relative aim sensitivity while zoomed":   45},
         {"Grappling hook sensitivity":              30},
         {"Recoil recovery aim compensation":        false},
-        {"Reticle Advanced": [
-            {"Dot size":                            3},
-        ]},
     ]},
     {"winston": [
         {"Quick melee":                             ["mouse right click", "1"]},
     ]},
     {"zenyatta": [
-        {"Ability 1":                               "oem_7"},
-        {"Ability 2":                               "n"},
         {"Reticle Advanced": [           
             {"Crosshair length":                    2},
             {"Center gap":                          100},
             {"Opacity":                             20},
         ]},
         {"Reticle type":                            "Circle"},
+        {"Ability 1":                               "oem_7"},
+        {"Ability 2":                               "n"},
     ]},
 ]
